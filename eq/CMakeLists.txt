@@ -132,3 +132,14 @@ if(BUILD_TESTS)
     include(GoogleTest)
     gtest_discover_tests(EqTests)
 endif()
+
+# Install plugin and TypeScript definitions
+install(TARGETS ${PROJECT_NAME}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/plugins
+    RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/plugins
+)
+
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/eq-plugin.ts
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/plugins
+)
