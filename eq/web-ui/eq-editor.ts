@@ -1,5 +1,5 @@
 /**
- * Sesame EQ - Interactive Curve Editor
+ * Stinky EQ - Interactive Curve Editor
  * TypeScript reference implementation for EQ curve visualization with draggable bands
  */
 

@@ -54,3 +54,9 @@ The `delay-plugin.ts` file contains complete parameter metadata including:
 - Parameter ranges and default values
 - Conversion functions from normalized to actual values
 - Plugin identification and description
+
+## License
+
+MIT License - see [LICENSE](../LICENSE) file for details.
+
+Copyright (c) 2025 Stinky Computing

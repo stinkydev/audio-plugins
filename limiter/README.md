@@ -1,4 +1,4 @@
-# Sesame Limiter
+# Stinky Limiter
 
 A high-performance look-ahead brickwall limiter CLAP plugin with SIMD optimization.
 
@@ -71,7 +71,7 @@ Copy `StinkyLimiter.clap` to:
 
 ## Usage
 
-The Sesame Limiter is a simple, effective brickwall limiter designed for mastering and final stage limiting:
+The Stinky Limiter is a simple, effective brickwall limiter designed for mastering and final stage limiting:
 
 1. **Basic Mastering**: Set threshold to -0.1 dB and output level to -0.1 dB for maximum loudness without clipping
 2. **Conservative Mastering**: Set threshold to -0.3 dB and output level to -0.3 dB for safer headroom
@@ -109,7 +109,9 @@ The fixed lookahead allows the limiter to "see into the future" and apply gain r
 
 ## License
 
-Copyright 2025 Stinky Computing
+MIT License - see [LICENSE](../LICENSE) file for details.
+
+Copyright (c) 2025 Stinky Computing
 
 ## Support
 

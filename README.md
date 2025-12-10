@@ -187,7 +187,9 @@ ctest -C Release -R Delay
 
 ## License
 
-Copyright 2025 Stinky Computing
+MIT License - see [LICENSE](LICENSE) file for details.
+
+Copyright (c) 2025 Stinky Computing
 
 ## Credits
 

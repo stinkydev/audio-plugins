@@ -1,4 +1,4 @@
-# Sesame EQ - Interactive Curve Editor
+# Stinky EQ - Interactive Curve Editor
 
 A TypeScript and DOM-based reference implementation for visualizing and editing EQ curves with draggable bands.
 
@@ -171,4 +171,6 @@ The EQ settings are exported in this JSON format:
 
 ## License
 
-Copyright 2025 Stinky Computing
+MIT License - see [LICENSE](../../LICENSE) file for details.
+
+Copyright (c) 2025 Stinky Computing

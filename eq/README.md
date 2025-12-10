@@ -1,4 +1,4 @@
-# Sesame EQ
+# Stinky EQ
 
 A high-quality 4-band parametric equalizer CLAP plugin with multiple filter types.
 
@@ -154,7 +154,9 @@ Copy `StinkyEQ.clap` to:
 
 ## License
 
-Copyright 2025 Stinky Computing
+MIT License - see [LICENSE](../LICENSE) file for details.
+
+Copyright (c) 2025 Stinky Computing
 
 ## Credits
 

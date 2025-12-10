@@ -1,4 +1,4 @@
-# Sesame Audio Compressor CLAP
+# Stinky Compressor
 
 A high-performance audio compressor CLAP plugin with SIMD optimizations.
 
@@ -112,7 +112,9 @@ Follows Google C++ Style Guide:
 
 ## License
 
-This project is provided as-is for educational and commercial use. CLAP is an open-source plugin format under the MIT license.
+MIT License - see [LICENSE](../LICENSE) file for details.
+
+Copyright (c) 2025 Stinky Computing
 
 ## CLAP Advantages
 
