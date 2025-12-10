@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Global options
 option(BUILD_COMPRESSOR "Build Sesame Compressor plugin" ON)
 option(BUILD_EQ "Build Sesame EQ plugin" ON)
+option(BUILD_LIMITER "Build Sesame Limiter plugin" ON)
 option(BUILD_TESTS "Build test suite for all plugins" ON)
 option(ENABLE_SIMD "Enable SIMD optimizations (compressor)" ON)
 
@@ -40,6 +41,10 @@ if(BUILD_EQ)
     add_subdirectory(eq)
 endif()
 
+if(BUILD_LIMITER)
+    add_subdirectory(limiter)
+endif()
+
 # Print build summary
 message(STATUS "")
 message(STATUS "═══════════════════════════════════════")
@@ -47,6 +52,7 @@ message(STATUS "  Audio Plugins Build Configuration")
 message(STATUS "═══════════════════════════════════════")
 message(STATUS "  Compressor: ${BUILD_COMPRESSOR}")
 message(STATUS "  EQ:         ${BUILD_EQ}")
+message(STATUS "  Limiter:    ${BUILD_LIMITER}")
 message(STATUS "  Tests:      ${BUILD_TESTS}")
 message(STATUS "  SIMD:       ${ENABLE_SIMD}")
 message(STATUS "═══════════════════════════════════════")
