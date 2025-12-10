@@ -37,7 +37,7 @@ void BiquadFilter::SetCoefficients(double b0, double b1, double b2,
   a2_ = a2 / a0;
 }
 
-void BiquadFilter::SetLowPass(double frequency, double q, double sample_rate) {
+void BiquadFilter::SetHighCut(double frequency, double q, double sample_rate) {
   const double omega = 2.0 * kPi * frequency / sample_rate;
   const double cos_omega = std::cos(omega);
   const double sin_omega = std::sin(omega);
@@ -53,7 +53,7 @@ void BiquadFilter::SetLowPass(double frequency, double q, double sample_rate) {
   SetCoefficients(b0, b1, b2, a0, a1, a2);
 }
 
-void BiquadFilter::SetHighPass(double frequency, double q, double sample_rate) {
+void BiquadFilter::SetLowCut(double frequency, double q, double sample_rate) {
   const double omega = 2.0 * kPi * frequency / sample_rate;
   const double cos_omega = std::cos(omega);
   const double sin_omega = std::sin(omega);
@@ -105,8 +105,9 @@ void BiquadFilter::SetHighShelf(double frequency, double gain_db, double q,
   SetCoefficients(b0, b1, b2, a0, a1, a2);
 }
 
-void BiquadFilter::SetPeak(double frequency, double gain_db, double q,
+void BiquadFilter::SetBell(double frequency, double gain_db, double q,
                            double sample_rate) {
+  // Bell EQ (peaking filter), RBJ Audio EQ Cookbook
   const double A = std::pow(10.0, gain_db / 40.0);
   const double omega = 2.0 * kPi * frequency / sample_rate;
   const double cos_omega = std::cos(omega);
@@ -119,54 +120,6 @@ void BiquadFilter::SetPeak(double frequency, double gain_db, double q,
   const double a0 = 1.0 + alpha / A;
   const double a1 = -2.0 * cos_omega;
   const double a2 = 1.0 - alpha / A;
-
-  SetCoefficients(b0, b1, b2, a0, a1, a2);
-}
-
-void BiquadFilter::SetBandPass(double frequency, double q, double sample_rate) {
-  const double omega = 2.0 * kPi * frequency / sample_rate;
-  const double cos_omega = std::cos(omega);
-  const double sin_omega = std::sin(omega);
-  const double alpha = sin_omega / (2.0 * q);
-
-  const double b0 = alpha;
-  const double b1 = 0.0;
-  const double b2 = -alpha;
-  const double a0 = 1.0 + alpha;
-  const double a1 = -2.0 * cos_omega;
-  const double a2 = 1.0 - alpha;
-
-  SetCoefficients(b0, b1, b2, a0, a1, a2);
-}
-
-void BiquadFilter::SetNotch(double frequency, double q, double sample_rate) {
-  const double omega = 2.0 * kPi * frequency / sample_rate;
-  const double cos_omega = std::cos(omega);
-  const double sin_omega = std::sin(omega);
-  const double alpha = sin_omega / (2.0 * q);
-
-  const double b0 = 1.0;
-  const double b1 = -2.0 * cos_omega;
-  const double b2 = 1.0;
-  const double a0 = 1.0 + alpha;
-  const double a1 = -2.0 * cos_omega;
-  const double a2 = 1.0 - alpha;
-
-  SetCoefficients(b0, b1, b2, a0, a1, a2);
-}
-
-void BiquadFilter::SetAllPass(double frequency, double q, double sample_rate) {
-  const double omega = 2.0 * kPi * frequency / sample_rate;
-  const double cos_omega = std::cos(omega);
-  const double sin_omega = std::sin(omega);
-  const double alpha = sin_omega / (2.0 * q);
-
-  const double b0 = 1.0 - alpha;
-  const double b1 = -2.0 * cos_omega;
-  const double b2 = 1.0 + alpha;
-  const double a0 = 1.0 + alpha;
-  const double a1 = -2.0 * cos_omega;
-  const double a2 = 1.0 - alpha;
 
   SetCoefficients(b0, b1, b2, a0, a1, a2);
 }
@@ -198,12 +151,12 @@ EqProcessor::EqProcessor()
   params_.bands[0].gain_db = 0.0f;
   params_.bands[0].q = 0.707f;
   
-  params_.bands[1].type = FilterType::kPeak;
+  params_.bands[1].type = FilterType::kBell;
   params_.bands[1].frequency_hz = 500.0f;
   params_.bands[1].gain_db = 0.0f;
   params_.bands[1].q = 1.0f;
   
-  params_.bands[2].type = FilterType::kPeak;
+  params_.bands[2].type = FilterType::kBell;
   params_.bands[2].frequency_hz = 2000.0f;
   params_.bands[2].gain_db = 0.0f;
   params_.bands[2].q = 1.0f;
@@ -237,14 +190,14 @@ void EqProcessor::UpdateBandCoefficients(size_t band_index) {
   const auto& band = params_.bands[band_index];
   
   switch (band.type) {
-    case FilterType::kLowPass:
-      filters_left_[band_index].SetLowPass(band.frequency_hz, band.q, sample_rate_);
-      filters_right_[band_index].SetLowPass(band.frequency_hz, band.q, sample_rate_);
+    case FilterType::kHighCut:
+      filters_left_[band_index].SetHighCut(band.frequency_hz, band.q, sample_rate_);
+      filters_right_[band_index].SetHighCut(band.frequency_hz, band.q, sample_rate_);
       break;
       
-    case FilterType::kHighPass:
-      filters_left_[band_index].SetHighPass(band.frequency_hz, band.q, sample_rate_);
-      filters_right_[band_index].SetHighPass(band.frequency_hz, band.q, sample_rate_);
+    case FilterType::kLowCut:
+      filters_left_[band_index].SetLowCut(band.frequency_hz, band.q, sample_rate_);
+      filters_right_[band_index].SetLowCut(band.frequency_hz, band.q, sample_rate_);
       break;
       
     case FilterType::kLowShelf:
@@ -261,26 +214,11 @@ void EqProcessor::UpdateBandCoefficients(size_t band_index) {
                                               band.q, sample_rate_);
       break;
       
-    case FilterType::kPeak:
-      filters_left_[band_index].SetPeak(band.frequency_hz, band.gain_db,
+    case FilterType::kBell:
+      filters_left_[band_index].SetBell(band.frequency_hz, band.gain_db,
                                         band.q, sample_rate_);
-      filters_right_[band_index].SetPeak(band.frequency_hz, band.gain_db,
+      filters_right_[band_index].SetBell(band.frequency_hz, band.gain_db,
                                          band.q, sample_rate_);
-      break;
-      
-    case FilterType::kBandPass:
-      filters_left_[band_index].SetBandPass(band.frequency_hz, band.q, sample_rate_);
-      filters_right_[band_index].SetBandPass(band.frequency_hz, band.q, sample_rate_);
-      break;
-      
-    case FilterType::kNotch:
-      filters_left_[band_index].SetNotch(band.frequency_hz, band.q, sample_rate_);
-      filters_right_[band_index].SetNotch(band.frequency_hz, band.q, sample_rate_);
-      break;
-      
-    case FilterType::kAllPass:
-      filters_left_[band_index].SetAllPass(band.frequency_hz, band.q, sample_rate_);
-      filters_right_[band_index].SetAllPass(band.frequency_hz, band.q, sample_rate_);
       break;
   }
 }

@@ -12,19 +12,16 @@ namespace fast_eq {
 
 // Filter types for each band
 enum class FilterType {
-  kLowPass = 0,
-  kHighPass,
-  kLowShelf,
-  kHighShelf,
-  kPeak,
-  kBandPass,
-  kNotch,
-  kAllPass
+  kLowCut = 0,    // Only available on Band 1 (high-pass)
+  kBell,          // Available on all bands
+  kLowShelf,      // Available on all bands
+  kHighShelf,     // Available on all bands
+  kHighCut        // Only available on Band 4 (low-pass)
 };
 
 // Single band parameters
 struct BandParams {
-  FilterType type = FilterType::kPeak;
+  FilterType type = FilterType::kBell;
   float frequency_hz = 1000.0f;
   float gain_db = 0.0f;
   float q = 0.707f;  // Q factor (bandwidth)
@@ -46,14 +43,11 @@ class BiquadFilter {
   void SetCoefficients(double b0, double b1, double b2, 
                        double a0, double a1, double a2);
   
-  void SetLowPass(double frequency, double q, double sample_rate);
-  void SetHighPass(double frequency, double q, double sample_rate);
+  void SetHighCut(double frequency, double q, double sample_rate);
+  void SetLowCut(double frequency, double q, double sample_rate);
   void SetLowShelf(double frequency, double gain_db, double q, double sample_rate);
   void SetHighShelf(double frequency, double gain_db, double q, double sample_rate);
-  void SetPeak(double frequency, double gain_db, double q, double sample_rate);
-  void SetBandPass(double frequency, double q, double sample_rate);
-  void SetNotch(double frequency, double q, double sample_rate);
-  void SetAllPass(double frequency, double q, double sample_rate);
+  void SetBell(double frequency, double gain_db, double q, double sample_rate);
   
   float Process(float input);
   void Reset();

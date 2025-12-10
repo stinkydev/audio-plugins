@@ -140,12 +140,12 @@ TEST_F(ClapEqPluginTest, ParamsValueToTextFormatsCorrectly) {
   
   // Test filter type formatting
   EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Type, 
-              static_cast<double>(FilterType::kLowPass), display, sizeof(display)));
-  EXPECT_STREQ(display, "Low Pass");
+              static_cast<double>(FilterType::kHighCut), display, sizeof(display)));
+  EXPECT_STREQ(display, "High Cut");
   
   EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Type,
-              static_cast<double>(FilterType::kPeak), display, sizeof(display)));
-  EXPECT_STREQ(display, "Peak");
+              static_cast<double>(FilterType::kLowCut), display, sizeof(display)));
+  EXPECT_STREQ(display, "Low Cut");
 }
 
 TEST_F(ClapEqPluginTest, AudioPortsCountReturnsOne) {

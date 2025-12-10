@@ -194,14 +194,14 @@ EqClap::EqClap(const clap_host_t* host)
   param_values_[kParamIdBand1Enable].store(1.0);
   
   // Band 2 (Peak)
-  param_values_[kParamIdBand2Type].store(static_cast<double>(FilterType::kPeak));
+  param_values_[kParamIdBand2Type].store(static_cast<double>(FilterType::kBell));
   param_values_[kParamIdBand2Freq].store(500.0);
   param_values_[kParamIdBand2Gain].store(0.0);
   param_values_[kParamIdBand2Q].store(1.0);
   param_values_[kParamIdBand2Enable].store(1.0);
   
   // Band 3 (Peak)
-  param_values_[kParamIdBand3Type].store(static_cast<double>(FilterType::kPeak));
+  param_values_[kParamIdBand3Type].store(static_cast<double>(FilterType::kBell));
   param_values_[kParamIdBand3Freq].store(2000.0);
   param_values_[kParamIdBand3Gain].store(0.0);
   param_values_[kParamIdBand3Q].store(1.0);
@@ -325,10 +325,10 @@ bool EqClap::ParamsInfo(uint32_t param_index,
         std::snprintf(info->name, sizeof(info->name), "Band %d Type", band);
         std::snprintf(info->module, sizeof(info->module), "Band %d", band);
         info->min_value = 0.0;
-        info->max_value = 7.0;
+        info->max_value = 4.0;  // 5 filter types: HighPass, Peak, LowShelf, HighShelf, LowPass
         info->default_value = (band == 1 || band == 4) ? 
             static_cast<double>(band == 1 ? FilterType::kLowShelf : FilterType::kHighShelf) :
-            static_cast<double>(FilterType::kPeak);
+            static_cast<double>(FilterType::kBell);
         info->flags = CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED;
         break;
       case 1:  // Frequency
@@ -401,11 +401,10 @@ bool EqClap::ParamsValueToText(clap_id param_id, double value,
       case 0:  // Type
         {
           const char* type_names[] = {
-            "Low Pass", "High Pass", "Low Shelf", "High Shelf",
-            "Peak", "Band Pass", "Notch", "All Pass"
+            "Low Cut", "Bell", "Low Shelf", "High Shelf", "High Cut"
           };
           const int type_idx = static_cast<int>(value);
-          if (type_idx >= 0 && type_idx < 8) {
+          if (type_idx >= 0 && type_idx < 5) {
             std::snprintf(display, size, "%s", type_names[type_idx]);
           } else {
             return false;

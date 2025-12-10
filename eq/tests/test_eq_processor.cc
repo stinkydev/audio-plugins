@@ -104,7 +104,7 @@ TEST_F(EqProcessorTest, PeakFilterBoostsAtFrequency) {
   EqParams params = processor_.GetParams();
   
   // Configure single peak band with boost
-  params.bands[0].type = FilterType::kPeak;
+  params.bands[0].type = FilterType::kBell;
   params.bands[0].frequency_hz = 1000.0f;
   params.bands[0].gain_db = 12.0f;
   params.bands[0].q = 1.0f;
@@ -121,7 +121,7 @@ TEST_F(EqProcessorTest, PeakFilterBoostsAtFrequency) {
   std::vector<float> left(512);
   std::vector<float> right(512);
   const float freq = 1000.0f;
-  const float omega = 2.0f * std::numbers::pi_v<float> * freq / kSampleRate;
+  const float omega = 2.0f * std::numbers::pi_v<float> * freq / static_cast<float>(kSampleRate);
   
   for (size_t i = 0; i < left.size(); ++i) {
     left[i] = right[i] = 0.5f * std::sin(omega * i);
@@ -150,8 +150,8 @@ TEST_F(EqProcessorTest, PeakFilterBoostsAtFrequency) {
 TEST_F(EqProcessorTest, LowPassFiltersHighFrequencies) {
   EqParams params = processor_.GetParams();
   
-  // Configure low pass filter at 1 kHz
-  params.bands[0].type = FilterType::kLowPass;
+  // Configure high cut (low pass) filter at 1 kHz
+  params.bands[0].type = FilterType::kHighCut;
   params.bands[0].frequency_hz = 1000.0f;
   params.bands[0].q = 0.707f;
   params.bands[0].enabled = true;
@@ -167,7 +167,7 @@ TEST_F(EqProcessorTest, LowPassFiltersHighFrequencies) {
   std::vector<float> left(512);
   std::vector<float> right(512);
   const float freq = 5000.0f;
-  const float omega = 2.0f * std::numbers::pi_v<float> * freq / kSampleRate;
+  const float omega = 2.0f * std::numbers::pi_v<float> * freq / static_cast<float>(kSampleRate);
   
   for (size_t i = 0; i < left.size(); ++i) {
     left[i] = right[i] = 0.5f * std::sin(omega * i);
@@ -195,8 +195,8 @@ TEST_F(EqProcessorTest, LowPassFiltersHighFrequencies) {
 TEST_F(EqProcessorTest, HighPassFiltersLowFrequencies) {
   EqParams params = processor_.GetParams();
   
-  // Configure high pass filter at 1 kHz
-  params.bands[0].type = FilterType::kHighPass;
+  // Configure low cut (high pass) filter at 1 kHz
+  params.bands[0].type = FilterType::kLowCut;
   params.bands[0].frequency_hz = 1000.0f;
   params.bands[0].q = 0.707f;
   params.bands[0].enabled = true;
@@ -212,7 +212,7 @@ TEST_F(EqProcessorTest, HighPassFiltersLowFrequencies) {
   std::vector<float> left(512);
   std::vector<float> right(512);
   const float freq = 200.0f;
-  const float omega = 2.0f * std::numbers::pi_v<float> * freq / kSampleRate;
+  const float omega = 2.0f * std::numbers::pi_v<float> * freq / static_cast<float>(kSampleRate);
   
   for (size_t i = 0; i < left.size(); ++i) {
     left[i] = right[i] = 0.5f * std::sin(omega * i);
@@ -239,7 +239,7 @@ TEST_F(EqProcessorTest, HighPassFiltersLowFrequencies) {
 
 TEST_F(EqProcessorTest, ResetClearsFilterState) {
   EqParams params = processor_.GetParams();
-  params.bands[0].type = FilterType::kPeak;
+  params.bands[0].type = FilterType::kBell;
   params.bands[0].frequency_hz = 1000.0f;
   params.bands[0].gain_db = 6.0f;
   params.bands[0].enabled = true;

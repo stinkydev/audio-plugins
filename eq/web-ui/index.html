@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sesame EQ - Interactive Curve Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #4CAF50;
+        }
+
+        .canvas-container {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 400px;
+            cursor: crosshair;
+            border-radius: 4px;
+        }
+
+        .controls {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .band-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .band-control {
+            background: #353535;
+            padding: 15px;
+            border-radius: 6px;
+            border: 2px solid transparent;
+            transition: border-color 0.2s;
+        }
+
+        .band-control.active {
+            border-color: #4CAF50;
+        }
+
+        .band-control h3 {
+            margin-bottom: 10px;
+            color: #4CAF50;
+            font-size: 14px;
+        }
+
+        .param-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .param {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .param label {
+            font-size: 12px;
+            color: #b0b0b0;
+        }
+
+        .param-value {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .param input[type="range"] {
+            width: 150px;
+        }
+
+        .param-display {
+            min-width: 60px;
+            text-align: right;
+            font-size: 12px;
+            font-family: monospace;
+            color: #4CAF50;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 4px;
+            background: #454545;
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #4CAF50;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #4CAF50;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
+
+        .global-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        button:active {
+            background: #3d8b40;
+        }
+
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #b0b0b0;
+        }
+
+        .info h4 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+
+        .info ul {
+            list-style-position: inside;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sesame EQ - Interactive Curve Editor</h1>
+        
+        <div class="canvas-container">
+            <canvas id="eqCanvas"></canvas>
+        </div>
+
+        <div class="controls">
+            <div class="band-controls" id="bandControls"></div>
+            
+            <div class="global-controls">
+                <button id="resetBtn">Reset All Bands</button>
+                <button id="exportBtn">Export Settings</button>
+            </div>
+        </div>
+
+        <div class="info">
+            <h4>Instructions:</h4>
+            <ul>
+                <li>Drag the colored dots on the canvas to adjust frequency and gain</li>
+                <li>Use the Q/Bandwidth sliders to adjust filter width</li>
+                <li>Each band has a different color for easy identification</li>
+                <li>Click on a band control panel to highlight it on the curve</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="eq-editor.js"></script>
+</body>
+</html>

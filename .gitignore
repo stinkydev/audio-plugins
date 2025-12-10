@@ -1,1 +1,7 @@
 build
+node_modules
+
+# EQ Editor TypeScript build artifacts
+eq/web-ui/eq-editor.js
+eq/web-ui/eq-editor.js.map
+eq/web-ui/eq-editor.d.ts
