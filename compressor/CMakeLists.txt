@@ -117,6 +117,7 @@ if(BUILD_TESTS)
     target_sources(CompressorTests
         PRIVATE
             src/compressor_processor.cc
+            src/compressor_clap.cc
             src/simd_utils.cc
     )
     
