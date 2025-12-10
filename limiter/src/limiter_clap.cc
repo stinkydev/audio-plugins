@@ -12,10 +12,10 @@ namespace fast_limiter {
 
 namespace {
 
-constexpr const char* kPluginId = "com.sesame.limiter";
-constexpr const char* kPluginName = "Sesame Limiter";
-constexpr const char* kPluginVendor = "Stinky Computing";
-constexpr const char* kPluginUrl = "https://github.com/fastlimiter";
+constexpr const char* kPluginId = "com.stinky.limiter";
+constexpr const char* kPluginName = "Limiter";
+constexpr const char* kPluginVendor = "Stinky";
+constexpr const char* kPluginUrl = "https://github.com/stinkydev/audio-plugins";
 constexpr const char* kPluginVersion = "1.0.0";
 constexpr const char* kPluginDescription = 
     "High-performance peak limiter with lookahead and SIMD optimization";
@@ -32,6 +32,23 @@ constexpr double kThresholdMin = -60.0;
 constexpr double kThresholdMax = 0.0;
 constexpr double kOutputLevelMin = -60.0;
 constexpr double kOutputLevelMax = 0.0;
+
+// Conversion helper functions
+inline double NormalizedToThreshold(double norm) {
+  return kThresholdMin + norm * (kThresholdMax - kThresholdMin);
+}
+
+inline double ThresholdToNormalized(double db) {
+  return (db - kThresholdMin) / (kThresholdMax - kThresholdMin);
+}
+
+inline double NormalizedToOutputLevel(double norm) {
+  return kOutputLevelMin + norm * (kOutputLevelMax - kOutputLevelMin);
+}
+
+inline double OutputLevelToNormalized(double db) {
+  return (db - kOutputLevelMin) / (kOutputLevelMax - kOutputLevelMin);
+}
 
 // CLAP plugin callbacks
 bool ClapInit(const clap_plugin_t* plugin) {
@@ -181,9 +198,9 @@ LimiterClap::LimiterClap(const clap_host_t* host)
   plugin_.get_extension = ClapGetExtension;
   plugin_.on_main_thread = ClapOnMainThread;
 
-  // Initialize parameters to defaults
-  param_values_[kParamIdThreshold].store(-0.1);
-  param_values_[kParamIdOutputLevel].store(-0.1);
+  // Initialize parameters to normalized defaults
+  param_values_[kParamIdThreshold].store(ThresholdToNormalized(-0.1));
+  param_values_[kParamIdOutputLevel].store(OutputLevelToNormalized(-0.1));
 }
 
 bool LimiterClap::Init() noexcept {
@@ -285,16 +302,16 @@ bool LimiterClap::ParamsInfo(uint32_t param_index,
     case kParamIdThreshold:
       std::snprintf(info->name, sizeof(info->name), "Threshold");
       std::snprintf(info->module, sizeof(info->module), "");
-      info->min_value = kThresholdMin;
-      info->max_value = kThresholdMax;
-      info->default_value = -0.1;
+      info->min_value = 0.0;
+      info->max_value = 1.0;
+      info->default_value = ThresholdToNormalized(-0.1);
       break;
     case kParamIdOutputLevel:
       std::snprintf(info->name, sizeof(info->name), "Output Level");
       std::snprintf(info->module, sizeof(info->module), "");
-      info->min_value = kOutputLevelMin;
-      info->max_value = kOutputLevelMax;
-      info->default_value = -0.1;
+      info->min_value = 0.0;
+      info->max_value = 1.0;
+      info->default_value = OutputLevelToNormalized(-0.1);
       break;
     default:
       return false;
@@ -316,8 +333,10 @@ bool LimiterClap::ParamsValueToText(clap_id param_id, double value,
 
   switch (param_id) {
     case kParamIdThreshold:
+      std::snprintf(display, size, "%.2f dB", NormalizedToThreshold(value));
+      break;
     case kParamIdOutputLevel:
-      std::snprintf(display, size, "%.2f dB", value);
+      std::snprintf(display, size, "%.2f dB", NormalizedToOutputLevel(value));
       break;
     default:
       return false;
@@ -339,10 +358,17 @@ bool LimiterClap::ParamsTextToValue(clap_id param_id, const char* display,
     return false;
   }
 
-  clap_param_info_t info;
-  if (!ParamsInfo(param_id, &info)) return false;
+  switch (param_id) {
+    case kParamIdThreshold:
+      *value = ThresholdToNormalized(std::clamp(parsed_value, kThresholdMin, kThresholdMax));
+      break;
+    case kParamIdOutputLevel:
+      *value = OutputLevelToNormalized(std::clamp(parsed_value, kOutputLevelMin, kOutputLevelMax));
+      break;
+    default:
+      return false;
+  }
 
-  *value = std::clamp(parsed_value, info.min_value, info.max_value);
   return true;
 }
 
@@ -395,8 +421,8 @@ void LimiterClap::ProcessParameterChanges(
 
 void LimiterClap::UpdateProcessorParams() noexcept {
   LimiterParams params;
-  params.threshold_db = static_cast<float>(param_values_[kParamIdThreshold].load());
-  params.output_level_db = static_cast<float>(param_values_[kParamIdOutputLevel].load());
+  params.threshold_db = static_cast<float>(NormalizedToThreshold(param_values_[kParamIdThreshold].load()));
+  params.output_level_db = static_cast<float>(NormalizedToOutputLevel(param_values_[kParamIdOutputLevel].load()));
   
   processor_.SetParams(params);
 }

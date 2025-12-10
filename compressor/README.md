@@ -55,9 +55,9 @@ cmake --build . --config Release
 
 ### Build Outputs
 
-- **Windows**: `build/Release/SesameCompressor.clap`
-- **macOS**: `build/SesameCompressor.clap` (bundle)
-- **Linux**: `build/SesameCompressor.clap`
+- **Windows**: `build/Release/StinkyCompressor.clap`
+- **macOS**: `build/StinkyCompressor.clap` (bundle)
+- **Linux**: `build/StinkyCompressor.clap`
 
 ## Installation
 

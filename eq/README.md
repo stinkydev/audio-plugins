@@ -26,6 +26,65 @@ A high-quality 4-band parametric equalizer CLAP plugin with multiple filter type
   - Output Gain (-12 dB to +12 dB)
   - Bypass switch
 
+## Web UI
+
+The `web-ui` folder contains an interactive TypeScript-based EQ curve editor for visualization and preset creation.
+
+### Using Normalized Parameters
+
+The web editor now supports exporting and importing settings using normalized 0..1 parameter values, matching the plugin's internal representation:
+
+```javascript
+// Access the editor instance (available after page load)
+const editor = window.eqEditor;
+
+// Export settings as normalized 0..1 values
+const normalizedSettings = editor.exportNormalizedSettings();
+console.log(normalizedSettings);
+// Example output:
+// {
+//   bands: [
+//     { type: 2, frequency: 0.234, gain: 0.5, q: 0.061, enabled: 1.0 },
+//     { type: 1, frequency: 0.456, gain: 0.5, q: 0.091, enabled: 1.0 },
+//     ...
+//   ],
+//   outputGain: 0.5,
+//   bypass: 0.0
+// }
+
+// Import settings from normalized 0..1 values
+editor.importNormalizedSettings({
+  bands: [
+    { type: 2, frequency: 0.3, gain: 0.6, q: 0.08, enabled: 1.0 },
+    // ... more bands
+  ],
+  outputGain: 0.5,
+  bypass: 0.0
+});
+```
+
+### Parameter Ranges (Normalized 0..1)
+
+- **Frequency**: Logarithmic mapping (20 Hz to 20 kHz)
+  - `0.0` = 20 Hz
+  - `0.5` ≈ 632 Hz
+  - `1.0` = 20000 Hz
+  
+- **Gain**: Linear mapping (-24 dB to +24 dB)
+  - `0.0` = -24 dB
+  - `0.5` = 0 dB
+  - `1.0` = +24 dB
+  
+- **Q**: Linear mapping (0.1 to 10.0)
+  - `0.0` = 0.1
+  - `0.091` ≈ 1.0 (default)
+  - `1.0` = 10.0
+  
+- **Output Gain**: Linear mapping (-12 dB to +12 dB)
+  - `0.0` = -12 dB
+  - `0.5` = 0 dB
+  - `1.0` = +12 dB
+
 ## Building
 
 ### Prerequisites
@@ -51,21 +110,21 @@ cmake --build . --config Release
 ctest -C Release
 ```
 
-The compiled plugin will be in `build/Release/SesameEQ.clap` (Windows) or appropriate location for your platform.
+The compiled plugin will be in `build/Release/StinkyEQ.clap` (Windows) or appropriate location for your platform.
 
 ## Installation
 
 ### Windows
-Copy `SesameEQ.clap` to:
+Copy `StinkyEQ.clap` to:
 - `C:\Program Files\Common Files\CLAP\`
 
 ### macOS
-Copy `SesameEQ.clap` to:
+Copy `StinkyEQ.clap` to:
 - `/Library/Audio/Plug-Ins/CLAP/`
 - `~/Library/Audio/Plug-Ins/CLAP/`
 
 ### Linux
-Copy `SesameEQ.clap` to:
+Copy `StinkyEQ.clap` to:
 - `~/.clap/`
 - `/usr/lib/clap/`
 

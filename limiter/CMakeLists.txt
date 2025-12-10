@@ -1,5 +1,5 @@
-# SesameLimiter Plugin
-project(SesameLimiter VERSION 1.0.0 LANGUAGES CXX)
+# StinkyLimiter Plugin
+project(StinkyLimiter VERSION 1.0.0 LANGUAGES CXX)
 
 # Use parent's C++ standard if not set
 if(NOT CMAKE_CXX_STANDARD)

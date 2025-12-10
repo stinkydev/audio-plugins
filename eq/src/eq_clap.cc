@@ -12,9 +12,9 @@ namespace fast_eq {
 
 namespace {
 
-constexpr const char* kPluginId = "com.sesame.eq";
-constexpr const char* kPluginName = "Sesame EQ";
-constexpr const char* kPluginVendor = "Stinky Computing";
+constexpr const char* kPluginId = "com.stinky.eq";
+constexpr const char* kPluginName = "EQ";
+constexpr const char* kPluginVendor = "Stinky";
 constexpr const char* kPluginUrl = "https://github.com/stinkydev/audio-plugins";
 constexpr const char* kPluginVersion = "1.0.0";
 constexpr const char* kPluginDescription = 
@@ -36,6 +36,41 @@ constexpr double kQMin = 0.1;
 constexpr double kQMax = 10.0;
 constexpr double kOutputGainMin = -12.0;
 constexpr double kOutputGainMax = 12.0;
+
+// Conversion helper functions
+inline double NormalizedToFrequency(double norm) {
+  // Logarithmic scaling for frequency
+  return kFreqMin * std::pow(kFreqMax / kFreqMin, norm);
+}
+
+inline double FrequencyToNormalized(double hz) {
+  return std::log(hz / kFreqMin) / std::log(kFreqMax / kFreqMin);
+}
+
+inline double NormalizedToGain(double norm) {
+  return kGainMin + norm * (kGainMax - kGainMin);
+}
+
+inline double GainToNormalized(double db) {
+  return (db - kGainMin) / (kGainMax - kGainMin);
+}
+
+inline double NormalizedToQ(double norm) {
+  // Linear scaling for Q
+  return kQMin + norm * (kQMax - kQMin);
+}
+
+inline double QToNormalized(double q) {
+  return (q - kQMin) / (kQMax - kQMin);
+}
+
+inline double NormalizedToOutputGain(double norm) {
+  return kOutputGainMin + norm * (kOutputGainMax - kOutputGainMin);
+}
+
+inline double OutputGainToNormalized(double db) {
+  return (db - kOutputGainMin) / (kOutputGainMax - kOutputGainMin);
+}
 
 // CLAP plugin callbacks
 bool ClapInit(const clap_plugin_t* plugin) {
@@ -185,37 +220,37 @@ EqClap::EqClap(const clap_host_t* host)
   plugin_.get_extension = ClapGetExtension;
   plugin_.on_main_thread = ClapOnMainThread;
 
-  // Initialize parameters to defaults
+  // Initialize parameters to normalized defaults
   // Band 1 (Low Shelf)
   param_values_[kParamIdBand1Type].store(static_cast<double>(FilterType::kLowShelf));
-  param_values_[kParamIdBand1Freq].store(100.0);
-  param_values_[kParamIdBand1Gain].store(0.0);
-  param_values_[kParamIdBand1Q].store(0.707);
+  param_values_[kParamIdBand1Freq].store(FrequencyToNormalized(100.0));
+  param_values_[kParamIdBand1Gain].store(GainToNormalized(0.0));
+  param_values_[kParamIdBand1Q].store(QToNormalized(0.707));
   param_values_[kParamIdBand1Enable].store(1.0);
   
-  // Band 2 (Peak)
+  // Band 2 (Bell)
   param_values_[kParamIdBand2Type].store(static_cast<double>(FilterType::kBell));
-  param_values_[kParamIdBand2Freq].store(500.0);
-  param_values_[kParamIdBand2Gain].store(0.0);
-  param_values_[kParamIdBand2Q].store(1.0);
+  param_values_[kParamIdBand2Freq].store(FrequencyToNormalized(500.0));
+  param_values_[kParamIdBand2Gain].store(GainToNormalized(0.0));
+  param_values_[kParamIdBand2Q].store(QToNormalized(1.0));
   param_values_[kParamIdBand2Enable].store(1.0);
   
-  // Band 3 (Peak)
+  // Band 3 (Bell)
   param_values_[kParamIdBand3Type].store(static_cast<double>(FilterType::kBell));
-  param_values_[kParamIdBand3Freq].store(2000.0);
-  param_values_[kParamIdBand3Gain].store(0.0);
-  param_values_[kParamIdBand3Q].store(1.0);
+  param_values_[kParamIdBand3Freq].store(FrequencyToNormalized(2000.0));
+  param_values_[kParamIdBand3Gain].store(GainToNormalized(0.0));
+  param_values_[kParamIdBand3Q].store(QToNormalized(1.0));
   param_values_[kParamIdBand3Enable].store(1.0);
   
   // Band 4 (High Shelf)
   param_values_[kParamIdBand4Type].store(static_cast<double>(FilterType::kHighShelf));
-  param_values_[kParamIdBand4Freq].store(8000.0);
-  param_values_[kParamIdBand4Gain].store(0.0);
-  param_values_[kParamIdBand4Q].store(0.707);
+  param_values_[kParamIdBand4Freq].store(FrequencyToNormalized(8000.0));
+  param_values_[kParamIdBand4Gain].store(GainToNormalized(0.0));
+  param_values_[kParamIdBand4Q].store(QToNormalized(0.707));
   param_values_[kParamIdBand4Enable].store(1.0);
   
   // Global
-  param_values_[kParamIdOutputGain].store(0.0);
+  param_values_[kParamIdOutputGain].store(OutputGainToNormalized(0.0));
   param_values_[kParamIdBypass].store(0.0);
 }
 
@@ -334,24 +369,24 @@ bool EqClap::ParamsInfo(uint32_t param_index,
       case 1:  // Frequency
         std::snprintf(info->name, sizeof(info->name), "Band %d Frequency", band);
         std::snprintf(info->module, sizeof(info->module), "Band %d", band);
-        info->min_value = kFreqMin;
-        info->max_value = kFreqMax;
-        info->default_value = (band == 1) ? 100.0 : (band == 2) ? 500.0 : 
-                              (band == 3) ? 2000.0 : 8000.0;
+        info->min_value = 0.0;
+        info->max_value = 1.0;
+        info->default_value = (band == 1) ? FrequencyToNormalized(100.0) : (band == 2) ? FrequencyToNormalized(500.0) : 
+                              (band == 3) ? FrequencyToNormalized(2000.0) : FrequencyToNormalized(8000.0);
         break;
       case 2:  // Gain
         std::snprintf(info->name, sizeof(info->name), "Band %d Gain", band);
         std::snprintf(info->module, sizeof(info->module), "Band %d", band);
-        info->min_value = kGainMin;
-        info->max_value = kGainMax;
-        info->default_value = 0.0;
+        info->min_value = 0.0;
+        info->max_value = 1.0;
+        info->default_value = GainToNormalized(0.0);
         break;
       case 3:  // Q
         std::snprintf(info->name, sizeof(info->name), "Band %d Q", band);
         std::snprintf(info->module, sizeof(info->module), "Band %d", band);
-        info->min_value = kQMin;
-        info->max_value = kQMax;
-        info->default_value = (band == 2 || band == 3) ? 1.0 : 0.707;
+        info->min_value = 0.0;
+        info->max_value = 1.0;
+        info->default_value = (band == 2 || band == 3) ? QToNormalized(1.0) : QToNormalized(0.707);
         break;
       case 4:  // Enable
         std::snprintf(info->name, sizeof(info->name), "Band %d Enable", band);
@@ -365,9 +400,9 @@ bool EqClap::ParamsInfo(uint32_t param_index,
   } else if (param_index == kParamIdOutputGain) {
     std::snprintf(info->name, sizeof(info->name), "Output Gain");
     std::snprintf(info->module, sizeof(info->module), "");
-    info->min_value = kOutputGainMin;
-    info->max_value = kOutputGainMax;
-    info->default_value = 0.0;
+    info->min_value = 0.0;
+    info->max_value = 1.0;
+    info->default_value = OutputGainToNormalized(0.0);
   } else if (param_index == kParamIdBypass) {
     std::snprintf(info->name, sizeof(info->name), "Bypass");
     std::snprintf(info->module, sizeof(info->module), "");
@@ -412,24 +447,27 @@ bool EqClap::ParamsValueToText(clap_id param_id, double value,
         }
         break;
       case 1:  // Frequency
-        if (value >= 1000.0) {
-          std::snprintf(display, size, "%.2f kHz", value / 1000.0);
-        } else {
-          std::snprintf(display, size, "%.1f Hz", value);
+        {
+          double freq = NormalizedToFrequency(value);
+          if (freq >= 1000.0) {
+            std::snprintf(display, size, "%.2f kHz", freq / 1000.0);
+          } else {
+            std::snprintf(display, size, "%.1f Hz", freq);
+          }
         }
         break;
       case 2:  // Gain
-        std::snprintf(display, size, "%.1f dB", value);
+        std::snprintf(display, size, "%.1f dB", NormalizedToGain(value));
         break;
       case 3:  // Q
-        std::snprintf(display, size, "%.2f", value);
+        std::snprintf(display, size, "%.2f", NormalizedToQ(value));
         break;
       case 4:  // Enable
         std::snprintf(display, size, "%s", value > 0.5 ? "On" : "Off");
         break;
     }
   } else if (param_id == kParamIdOutputGain) {
-    std::snprintf(display, size, "%.1f dB", value);
+    std::snprintf(display, size, "%.1f dB", NormalizedToOutputGain(value));
   } else if (param_id == kParamIdBypass) {
     std::snprintf(display, size, "%s", value > 0.5 ? "On" : "Off");
   } else {
@@ -452,10 +490,35 @@ bool EqClap::ParamsTextToValue(clap_id param_id, const char* display,
     return false;
   }
 
-  clap_param_info_t info;
-  if (!ParamsInfo(param_id, &info)) return false;
+  auto get_param_type = [](clap_id idx) { return idx % 5; };
 
-  *value = std::clamp(parsed_value, info.min_value, info.max_value);
+  if (param_id < kParamIdOutputGain) {
+    const int param_type = get_param_type(param_id);
+    switch (param_type) {
+      case 0:  // Type (already in correct range)
+        *value = std::clamp(parsed_value, 0.0, 4.0);
+        break;
+      case 1:  // Frequency
+        *value = FrequencyToNormalized(std::clamp(parsed_value, kFreqMin, kFreqMax));
+        break;
+      case 2:  // Gain
+        *value = GainToNormalized(std::clamp(parsed_value, kGainMin, kGainMax));
+        break;
+      case 3:  // Q
+        *value = QToNormalized(std::clamp(parsed_value, kQMin, kQMax));
+        break;
+      case 4:  // Enable
+        *value = std::clamp(parsed_value, 0.0, 1.0);
+        break;
+    }
+  } else if (param_id == kParamIdOutputGain) {
+    *value = OutputGainToNormalized(std::clamp(parsed_value, kOutputGainMin, kOutputGainMax));
+  } else if (param_id == kParamIdBypass) {
+    *value = std::clamp(parsed_value, 0.0, 1.0);
+  } else {
+    return false;
+  }
+
   return true;
 }
 
@@ -513,13 +576,13 @@ void EqClap::UpdateProcessorParams() noexcept {
     const int base_idx = i * 5;
     params.bands[i].type = static_cast<FilterType>(
         static_cast<int>(param_values_[base_idx + 0].load()));
-    params.bands[i].frequency_hz = static_cast<float>(param_values_[base_idx + 1].load());
-    params.bands[i].gain_db = static_cast<float>(param_values_[base_idx + 2].load());
-    params.bands[i].q = static_cast<float>(param_values_[base_idx + 3].load());
+    params.bands[i].frequency_hz = static_cast<float>(NormalizedToFrequency(param_values_[base_idx + 1].load()));
+    params.bands[i].gain_db = static_cast<float>(NormalizedToGain(param_values_[base_idx + 2].load()));
+    params.bands[i].q = static_cast<float>(NormalizedToQ(param_values_[base_idx + 3].load()));
     params.bands[i].enabled = param_values_[base_idx + 4].load() > 0.5;
   }
   
-  params.output_gain_db = static_cast<float>(param_values_[kParamIdOutputGain].load());
+  params.output_gain_db = static_cast<float>(NormalizedToOutputGain(param_values_[kParamIdOutputGain].load()));
   params.bypass = param_values_[kParamIdBypass].load() > 0.5;
   
   processor_.SetParams(params);

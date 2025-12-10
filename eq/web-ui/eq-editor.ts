@@ -31,6 +31,61 @@ interface EQSettings {
     bypass: boolean;
 }
 
+// Parameter conversion functions (matching C++ implementation)
+class ParameterConversion {
+    // Frequency ranges
+    private static readonly FREQ_MIN = 20.0;
+    private static readonly FREQ_MAX = 20000.0;
+    
+    // Gain ranges
+    private static readonly GAIN_MIN = -24.0;
+    private static readonly GAIN_MAX = 24.0;
+    
+    // Q ranges
+    private static readonly Q_MIN = 0.1;
+    private static readonly Q_MAX = 10.0;
+    
+    // Output gain ranges
+    private static readonly OUTPUT_GAIN_MIN = -12.0;
+    private static readonly OUTPUT_GAIN_MAX = 12.0;
+    
+    // Frequency conversions (logarithmic)
+    static normalizedToFrequency(norm: number): number {
+        return this.FREQ_MIN * Math.pow(this.FREQ_MAX / this.FREQ_MIN, norm);
+    }
+    
+    static frequencyToNormalized(hz: number): number {
+        return Math.log(hz / this.FREQ_MIN) / Math.log(this.FREQ_MAX / this.FREQ_MIN);
+    }
+    
+    // Gain conversions (linear)
+    static normalizedToGain(norm: number): number {
+        return this.GAIN_MIN + norm * (this.GAIN_MAX - this.GAIN_MIN);
+    }
+    
+    static gainToNormalized(db: number): number {
+        return (db - this.GAIN_MIN) / (this.GAIN_MAX - this.GAIN_MIN);
+    }
+    
+    // Q conversions (linear)
+    static normalizedToQ(norm: number): number {
+        return this.Q_MIN + norm * (this.Q_MAX - this.Q_MIN);
+    }
+    
+    static qToNormalized(q: number): number {
+        return (q - this.Q_MIN) / (this.Q_MAX - this.Q_MIN);
+    }
+    
+    // Output gain conversions (linear)
+    static normalizedToOutputGain(norm: number): number {
+        return this.OUTPUT_GAIN_MIN + norm * (this.OUTPUT_GAIN_MAX - this.OUTPUT_GAIN_MIN);
+    }
+    
+    static outputGainToNormalized(db: number): number {
+        return (db - this.OUTPUT_GAIN_MIN) / (this.OUTPUT_GAIN_MAX - this.OUTPUT_GAIN_MIN);
+    }
+}
+
 class EQEditor {
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
@@ -812,20 +867,21 @@ class EQEditor {
     }
 
     private exportSettings(): void {
-        const settings: EQSettings = {
+        // Export normalized 0..1 values for plugin compatibility
+        const normalizedSettings = {
             bands: this.bands.map(band => ({
-                type: band.type,
-                frequency: band.frequency,
-                gain: band.gain,
-                q: band.q,
-                enabled: band.enabled
+                type: band.type,  // Type is already 0-4
+                frequency: ParameterConversion.frequencyToNormalized(band.frequency),
+                gain: ParameterConversion.gainToNormalized(band.gain),
+                q: ParameterConversion.qToNormalized(band.q),
+                enabled: band.enabled ? 1.0 : 0.0
             })),
-            outputGain: this.outputGain,
-            bypass: this.bypass
+            outputGain: ParameterConversion.outputGainToNormalized(this.outputGain),
+            bypass: this.bypass ? 1.0 : 0.0
         };
 
-        const json = JSON.stringify(settings, null, 2);
-        console.log('EQ Settings:', json);
+        const json = JSON.stringify(normalizedSettings, null, 2);
+        console.log('EQ Settings (normalized 0..1):', json);
         
         // Copy to clipboard if available
         if (navigator.clipboard) {
@@ -847,6 +903,77 @@ class EQEditor {
             this.updateControlValues(index);
             this.render();
         }
+    }
+
+    /**
+     * Import settings from normalized 0..1 parameter values
+     * @param normalizedSettings - Settings object with normalized (0..1) parameter values
+     */
+    public importNormalizedSettings(normalizedSettings: any): void {
+        if (normalizedSettings.bands && Array.isArray(normalizedSettings.bands)) {
+            normalizedSettings.bands.forEach((band: any, index: number) => {
+                if (index >= this.bands.length) return;
+                
+                if (band.type !== undefined) {
+                    this.bands[index].type = band.type;
+                }
+                if (band.frequency !== undefined) {
+                    this.bands[index].frequency = ParameterConversion.normalizedToFrequency(band.frequency);
+                }
+                if (band.gain !== undefined) {
+                    this.bands[index].gain = ParameterConversion.normalizedToGain(band.gain);
+                }
+                if (band.q !== undefined) {
+                    this.bands[index].q = ParameterConversion.normalizedToQ(band.q);
+                }
+                if (band.enabled !== undefined) {
+                    this.bands[index].enabled = band.enabled > 0.5;
+                }
+                
+                this.updateControlValues(index);
+                this.updateControlVisibility(index);
+            });
+        }
+        
+        if (normalizedSettings.outputGain !== undefined) {
+            this.outputGain = ParameterConversion.normalizedToOutputGain(normalizedSettings.outputGain);
+            const outputGainDisplay = document.getElementById('outputGainDisplay');
+            if (outputGainDisplay) {
+                outputGainDisplay.textContent = `${this.outputGain.toFixed(1)} dB`;
+            }
+            const outputGainSlider = document.getElementById('outputGainSlider') as HTMLInputElement;
+            if (outputGainSlider) {
+                outputGainSlider.value = this.outputGain.toString();
+            }
+        }
+        
+        if (normalizedSettings.bypass !== undefined) {
+            this.bypass = normalizedSettings.bypass > 0.5;
+            const bypassCheckbox = document.getElementById('bypassCheckbox') as HTMLInputElement;
+            if (bypassCheckbox) {
+                bypassCheckbox.checked = this.bypass;
+            }
+        }
+        
+        this.render();
+    }
+
+    /**
+     * Export settings as normalized 0..1 parameter values
+     * @returns Settings object with normalized (0..1) parameter values
+     */
+    public exportNormalizedSettings(): any {
+        return {
+            bands: this.bands.map(band => ({
+                type: band.type,
+                frequency: ParameterConversion.frequencyToNormalized(band.frequency),
+                gain: ParameterConversion.gainToNormalized(band.gain),
+                q: ParameterConversion.qToNormalized(band.q),
+                enabled: band.enabled ? 1.0 : 0.0
+            })),
+            outputGain: ParameterConversion.outputGainToNormalized(this.outputGain),
+            bypass: this.bypass ? 1.0 : 0.0
+        };
     }
 }
 

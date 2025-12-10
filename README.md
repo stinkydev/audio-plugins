@@ -67,9 +67,9 @@ cmake .. -DBUILD_EQ=OFF -DBUILD_TESTS=OFF
 ### Output Locations
 
 After building, compiled plugins will be in:
-- **Windows**: `build/compressor/Release/SesameCompressor.clap` and `build/eq/Release/SesameEQ.clap`
-- **macOS**: `build/compressor/SesameCompressor.clap` and `build/eq/SesameEQ.clap`
-- **Linux**: `build/compressor/SesameCompressor.clap` and `build/eq/SesameEQ.clap`
+- **Windows**: `build/compressor/Release/StinkyCompressor.clap` and `build/eq/Release/StinkyEQ.clap`
+- **macOS**: `build/compressor/StinkyCompressor.clap` and `build/eq/StinkyEQ.clap`
+- **Linux**: `build/compressor/StinkyCompressor.clap` and `build/eq/StinkyEQ.clap`
 
 ## Installation
 

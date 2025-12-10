@@ -1,5 +1,5 @@
-# SesameCompressor Plugin
-project(SesameCompressor VERSION 1.0.0 LANGUAGES CXX)
+# StinkyCompressor Plugin
+project(StinkyCompressor VERSION 1.0.0 LANGUAGES CXX)
 
 # Use parent's C++ standard if not set
 if(NOT CMAKE_CXX_STANDARD)

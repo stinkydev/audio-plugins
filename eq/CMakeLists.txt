@@ -1,5 +1,5 @@
-# SesameEQ Plugin
-project(SesameEQ VERSION 1.0.0 LANGUAGES CXX)
+# StinkyEQ Plugin
+project(StinkyEQ VERSION 1.0.0 LANGUAGES CXX)
 
 # Use parent's C++ standard if not set
 if(NOT CMAKE_CXX_STANDARD)

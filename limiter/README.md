@@ -41,7 +41,7 @@ cmake -B build -DBUILD_LIMITER=ON -DENABLE_SIMD=ON
 # Build
 cmake --build build --config Release
 
-# The plugin will be at: build/limiter/Release/SesameLimiter.clap
+# The plugin will be at: build/limiter/Release/StinkyLimiter.clap
 ```
 
 ### Build Options
@@ -52,19 +52,19 @@ cmake --build build --config Release
 ## Installation
 
 ### Windows
-Copy `SesameLimiter.clap` to:
+Copy `StinkyLimiter.clap` to:
 ```
 %COMMONPROGRAMFILES%\CLAP\
 ```
 
 ### macOS
-Copy `SesameLimiter.clap` to:
+Copy `StinkyLimiter.clap` to:
 ```
 /Library/Audio/Plug-Ins/CLAP/
 ```
 
 ### Linux
-Copy `SesameLimiter.clap` to:
+Copy `StinkyLimiter.clap` to:
 ```
 ~/.clap/
 ```

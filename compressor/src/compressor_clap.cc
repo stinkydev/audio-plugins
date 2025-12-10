@@ -12,10 +12,10 @@ namespace fast_compressor {
 
 namespace {
 
-constexpr const char* kPluginId = "com.sesame.compressor";
-constexpr const char* kPluginName = "Sesame Compressor";
-constexpr const char* kPluginVendor = "Stinky Computing";
-constexpr const char* kPluginUrl = "https://github.com/fastcompressor";
+constexpr const char* kPluginId = "com.stinky.compressor";
+constexpr const char* kPluginName = "Compressor";
+constexpr const char* kPluginVendor = "Stinky";
+constexpr const char* kPluginUrl = "https://github.com/stinkydev/audio-plugins";
 constexpr const char* kPluginVersion = "1.0.0";
 constexpr const char* kPluginDescription = 
     "High-performance audio compressor with SIMD optimization";
@@ -27,7 +27,7 @@ constexpr const char* kFeatures[] = {
     nullptr
 };
 
-// Parameter ranges
+// Parameter ranges (actual units)
 constexpr double kThresholdMin = -60.0;
 constexpr double kThresholdMax = 0.0;
 constexpr double kRatioMin = 1.0;
@@ -40,6 +40,58 @@ constexpr double kKneeMin = 0.0;
 constexpr double kKneeMax = 12.0;
 constexpr double kMakeupMin = -12.0;
 constexpr double kMakeupMax = 24.0;
+
+// Convert normalized [0,1] to actual values
+inline double NormalizedToThreshold(double norm) {
+  return kThresholdMin + norm * (kThresholdMax - kThresholdMin);
+}
+
+inline double ThresholdToNormalized(double db) {
+  return (db - kThresholdMin) / (kThresholdMax - kThresholdMin);
+}
+
+inline double NormalizedToRatio(double norm) {
+  // Logarithmic scaling for ratio
+  return kRatioMin * std::pow(kRatioMax / kRatioMin, norm);
+}
+
+inline double RatioToNormalized(double ratio) {
+  return std::log(ratio / kRatioMin) / std::log(kRatioMax / kRatioMin);
+}
+
+inline double NormalizedToAttack(double norm) {
+  // Logarithmic scaling for attack time
+  return kAttackMin * std::pow(kAttackMax / kAttackMin, norm);
+}
+
+inline double AttackToNormalized(double ms) {
+  return std::log(ms / kAttackMin) / std::log(kAttackMax / kAttackMin);
+}
+
+inline double NormalizedToRelease(double norm) {
+  // Logarithmic scaling for release time
+  return kReleaseMin * std::pow(kReleaseMax / kReleaseMin, norm);
+}
+
+inline double ReleaseToNormalized(double ms) {
+  return std::log(ms / kReleaseMin) / std::log(kReleaseMax / kReleaseMin);
+}
+
+inline double NormalizedToKnee(double norm) {
+  return kKneeMin + norm * (kKneeMax - kKneeMin);
+}
+
+inline double KneeToNormalized(double db) {
+  return (db - kKneeMin) / (kKneeMax - kKneeMin);
+}
+
+inline double NormalizedToMakeup(double norm) {
+  return kMakeupMin + norm * (kMakeupMax - kMakeupMin);
+}
+
+inline double MakeupToNormalized(double db) {
+  return (db - kMakeupMin) / (kMakeupMax - kMakeupMin);
+}
 
 // CLAP plugin callbacks
 bool ClapInit(const clap_plugin_t* plugin) {
@@ -189,13 +241,13 @@ CompressorClap::CompressorClap(const clap_host_t* host)
   plugin_.get_extension = ClapGetExtension;
   plugin_.on_main_thread = ClapOnMainThread;
 
-  // Initialize parameters to defaults
-  param_values_[kParamIdThreshold].store(-20.0);
-  param_values_[kParamIdRatio].store(4.0);
-  param_values_[kParamIdAttack].store(5.0);
-  param_values_[kParamIdRelease].store(50.0);
-  param_values_[kParamIdKnee].store(0.0);
-  param_values_[kParamIdMakeupGain].store(0.0);
+  // Initialize parameters to normalized defaults
+  param_values_[kParamIdThreshold].store(ThresholdToNormalized(-20.0));
+  param_values_[kParamIdRatio].store(RatioToNormalized(4.0));
+  param_values_[kParamIdAttack].store(AttackToNormalized(5.0));
+  param_values_[kParamIdRelease].store(ReleaseToNormalized(50.0));
+  param_values_[kParamIdKnee].store(KneeToNormalized(0.0));
+  param_values_[kParamIdMakeupGain].store(MakeupToNormalized(0.0));
   param_values_[kParamIdAutoMakeup].store(0.0);
 }
 
@@ -298,44 +350,44 @@ bool CompressorClap::ParamsInfo(uint32_t param_index,
     case kParamIdThreshold:
       std::snprintf(info->name, sizeof(info->name), "Threshold");
       std::snprintf(info->module, sizeof(info->module), "");
-      info->min_value = kThresholdMin;
-      info->max_value = kThresholdMax;
-      info->default_value = -20.0;
+      info->min_value = 0.0;
+      info->max_value = 1.0;
+      info->default_value = ThresholdToNormalized(-20.0);
       break;
     case kParamIdRatio:
       std::snprintf(info->name, sizeof(info->name), "Ratio");
       std::snprintf(info->module, sizeof(info->module), "");
-      info->min_value = kRatioMin;
-      info->max_value = kRatioMax;
-      info->default_value = 4.0;
+      info->min_value = 0.0;
+      info->max_value = 1.0;
+      info->default_value = RatioToNormalized(4.0);
       break;
     case kParamIdAttack:
       std::snprintf(info->name, sizeof(info->name), "Attack");
       std::snprintf(info->module, sizeof(info->module), "");
-      info->min_value = kAttackMin;
-      info->max_value = kAttackMax;
-      info->default_value = 5.0;
+      info->min_value = 0.0;
+      info->max_value = 1.0;
+      info->default_value = AttackToNormalized(5.0);
       break;
     case kParamIdRelease:
       std::snprintf(info->name, sizeof(info->name), "Release");
       std::snprintf(info->module, sizeof(info->module), "");
-      info->min_value = kReleaseMin;
-      info->max_value = kReleaseMax;
-      info->default_value = 50.0;
+      info->min_value = 0.0;
+      info->max_value = 1.0;
+      info->default_value = ReleaseToNormalized(50.0);
       break;
     case kParamIdKnee:
       std::snprintf(info->name, sizeof(info->name), "Knee");
       std::snprintf(info->module, sizeof(info->module), "");
-      info->min_value = kKneeMin;
-      info->max_value = kKneeMax;
-      info->default_value = 0.0;
+      info->min_value = 0.0;
+      info->max_value = 1.0;
+      info->default_value = KneeToNormalized(0.0);
       break;
     case kParamIdMakeupGain:
       std::snprintf(info->name, sizeof(info->name), "Makeup Gain");
       std::snprintf(info->module, sizeof(info->module), "");
-      info->min_value = kMakeupMin;
-      info->max_value = kMakeupMax;
-      info->default_value = 0.0;
+      info->min_value = 0.0;
+      info->max_value = 1.0;
+      info->default_value = MakeupToNormalized(0.0);
       break;
     case kParamIdAutoMakeup:
       std::snprintf(info->name, sizeof(info->name), "Auto Makeup");
@@ -365,16 +417,22 @@ bool CompressorClap::ParamsValueToText(clap_id param_id, double value,
 
   switch (param_id) {
     case kParamIdThreshold:
+      std::snprintf(display, size, "%.1f dB", NormalizedToThreshold(value));
+      break;
     case kParamIdKnee:
+      std::snprintf(display, size, "%.1f dB", NormalizedToKnee(value));
+      break;
     case kParamIdMakeupGain:
-      std::snprintf(display, size, "%.1f dB", value);
+      std::snprintf(display, size, "%.1f dB", NormalizedToMakeup(value));
       break;
     case kParamIdRatio:
-      std::snprintf(display, size, "%.1f:1", value);
+      std::snprintf(display, size, "%.1f:1", NormalizedToRatio(value));
       break;
     case kParamIdAttack:
+      std::snprintf(display, size, "%.1f ms", NormalizedToAttack(value));
+      break;
     case kParamIdRelease:
-      std::snprintf(display, size, "%.1f ms", value);
+      std::snprintf(display, size, "%.1f ms", NormalizedToRelease(value));
       break;
     case kParamIdAutoMakeup:
       std::snprintf(display, size, "%s", value > 0.5 ? "On" : "Off");
@@ -399,10 +457,39 @@ bool CompressorClap::ParamsTextToValue(clap_id param_id, const char* display,
     return false;
   }
 
-  clap_param_info_t info;
-  if (!ParamsInfo(param_id, &info)) return false;
+  // Convert parsed actual value to normalized [0,1]
+  switch (param_id) {
+    case kParamIdThreshold:
+      parsed_value = std::clamp(parsed_value, kThresholdMin, kThresholdMax);
+      *value = ThresholdToNormalized(parsed_value);
+      break;
+    case kParamIdRatio:
+      parsed_value = std::clamp(parsed_value, kRatioMin, kRatioMax);
+      *value = RatioToNormalized(parsed_value);
+      break;
+    case kParamIdAttack:
+      parsed_value = std::clamp(parsed_value, kAttackMin, kAttackMax);
+      *value = AttackToNormalized(parsed_value);
+      break;
+    case kParamIdRelease:
+      parsed_value = std::clamp(parsed_value, kReleaseMin, kReleaseMax);
+      *value = ReleaseToNormalized(parsed_value);
+      break;
+    case kParamIdKnee:
+      parsed_value = std::clamp(parsed_value, kKneeMin, kKneeMax);
+      *value = KneeToNormalized(parsed_value);
+      break;
+    case kParamIdMakeupGain:
+      parsed_value = std::clamp(parsed_value, kMakeupMin, kMakeupMax);
+      *value = MakeupToNormalized(parsed_value);
+      break;
+    case kParamIdAutoMakeup:
+      *value = std::clamp(parsed_value, 0.0, 1.0);
+      break;
+    default:
+      return false;
+  }
 
-  *value = std::clamp(parsed_value, info.min_value, info.max_value);
   return true;
 }
 
@@ -455,12 +542,12 @@ void CompressorClap::ProcessParameterChanges(
 
 void CompressorClap::UpdateProcessorParams() noexcept {
   CompressorParams params;
-  params.threshold_db = static_cast<float>(param_values_[kParamIdThreshold].load());
-  params.ratio = static_cast<float>(param_values_[kParamIdRatio].load());
-  params.attack_ms = static_cast<float>(param_values_[kParamIdAttack].load());
-  params.release_ms = static_cast<float>(param_values_[kParamIdRelease].load());
-  params.knee_db = static_cast<float>(param_values_[kParamIdKnee].load());
-  params.makeup_gain_db = static_cast<float>(param_values_[kParamIdMakeupGain].load());
+  params.threshold_db = static_cast<float>(NormalizedToThreshold(param_values_[kParamIdThreshold].load()));
+  params.ratio = static_cast<float>(NormalizedToRatio(param_values_[kParamIdRatio].load()));
+  params.attack_ms = static_cast<float>(NormalizedToAttack(param_values_[kParamIdAttack].load()));
+  params.release_ms = static_cast<float>(NormalizedToRelease(param_values_[kParamIdRelease].load()));
+  params.knee_db = static_cast<float>(NormalizedToKnee(param_values_[kParamIdKnee].load()));
+  params.makeup_gain_db = static_cast<float>(NormalizedToMakeup(param_values_[kParamIdMakeupGain].load()));
   params.auto_makeup = param_values_[kParamIdAutoMakeup].load() > 0.5;
   
   processor_.SetParams(params);
