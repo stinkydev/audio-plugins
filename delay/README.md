@@ -1,40 +1,26 @@
 # StinkyDelay
 
-A high-quality stereo delay CLAP plugin with feedback and stereo offset capabilities.
+A simple stereo delay CLAP plugin.
 
 ## Features
 
 - **Delay Time**: 0 to 2000 milliseconds
-- **Feedback**: Adjustable feedback amount (0-99%)
 - **Mix**: Dry/wet control (0-100%)
-- **Stereo Offset**: Create stereo width by offsetting right channel delay (-500 to +500ms)
-- **Sync to Tempo**: Option to synchronize delay time to host tempo (future feature)
+- Stereo processing with synchronized left and right channels
 
 ## Parameters
 
 All parameters use normalized 0..1 values internally:
 
 - **Delay Time**: Linear mapping (0-2000 ms)
-  - `0.0` = 0 ms
+  - `0.0` = 0 ms (default)
   - `0.25` = 500 ms
   - `1.0` = 2000 ms
-
-- **Feedback**: Linear mapping (0-99%)
-  - `0.0` = 0%
-  - `0.5` = 49.5%
-  - `1.0` = 99%
 
 - **Mix**: Linear mapping (0-100%)
   - `0.0` = 100% dry
   - `0.5` = 50/50 mix
-  - `1.0` = 100% wet
-
-- **Stereo Offset**: Linear mapping (-500 to +500 ms)
-  - `0.0` = -500 ms (right earlier)
-  - `0.5` = 0 ms (same time)
-  - `1.0` = +500 ms (right later)
-
-- **Sync to Tempo**: Boolean (0 = off, 1 = on)
+  - `1.0` = 100% wet (default)
 
 ## Building
 

@@ -4,19 +4,31 @@ A collection of high-quality CLAP audio plugins built with modern C++20.
 
 ## Plugins
 
-### 🎚️ Sesame Compressor
+### 🎚️ Stinky Compressor
 High-performance dynamics compressor with SIMD optimizations.
 - Threshold, ratio, attack, release controls
 - Soft knee compression
 - Auto makeup gain
 - [Learn more](compressor/README.md)
 
-### 🎛️ Sesame EQ
+### 🎛️ Stinky EQ
 4-band parametric equalizer with multiple filter types.
 - 8 filter types per band (Low/High Pass, Low/High Shelf, Peak, Band Pass, Notch, All Pass)
 - Independent frequency, gain, and Q controls
 - Global output gain and bypass
 - [Learn more](eq/README.md)
+
+### 🔊 Stinky Limiter
+Transparent brick-wall limiter for mastering and final stage processing.
+- Independent threshold and output level controls
+- Fast attack and release for transparent limiting
+- [Learn more](limiter/README.md)
+
+### 🔁 Stinky Delay
+Simple stereo delay effect with synchronized channels.
+- Delay time up to 2000ms
+- Dry/wet mix control
+- [Learn more](delay/README.md)
 
 ## Building All Plugins
 
@@ -52,7 +64,7 @@ You can customize the build using CMake options:
 
 ```powershell
 # Build specific plugins
-cmake .. -DBUILD_COMPRESSOR=ON -DBUILD_EQ=OFF
+cmake .. -DBUILD_COMPRESSOR=ON -DBUILD_EQ=OFF -DBUILD_LIMITER=OFF -DBUILD_DELAY=OFF
 
 # Disable tests
 cmake .. -DBUILD_TESTS=OFF
@@ -61,15 +73,19 @@ cmake .. -DBUILD_TESTS=OFF
 cmake .. -DENABLE_SIMD=OFF
 
 # Combine options
-cmake .. -DBUILD_EQ=OFF -DBUILD_TESTS=OFF
+cmake .. -DBUILD_COMPRESSOR=ON -DBUILD_EQ=ON -DBUILD_LIMITER=OFF -DBUILD_DELAY=OFF -DBUILD_TESTS=OFF
 ```
 
 ### Output Locations
 
 After building, compiled plugins will be in:
-- **Windows**: `build/compressor/Release/StinkyCompressor.clap` and `build/eq/Release/StinkyEQ.clap`
-- **macOS**: `build/compressor/StinkyCompressor.clap` and `build/eq/StinkyEQ.clap`
-- **Linux**: `build/compressor/StinkyCompressor.clap` and `build/eq/StinkyEQ.clap`
+- **Windows**: `build/{plugin}/Release/Stinky{Plugin}.clap`
+  - Example: `build/compressor/Release/StinkyCompressor.clap`
+- **macOS/Linux**: `build/{plugin}/Stinky{Plugin}.clap`
+  - Example: `build/compressor/StinkyCompressor.clap`
+
+All plugins also include TypeScript definitions for web integration:
+- `{plugin}/{plugin}-plugin.ts` (e.g., `compressor/compressor-plugin.ts`)
 
 ## Installation
 
@@ -99,15 +115,33 @@ Copy `.clap` files to:
 audio-plugins/
 ├── CMakeLists.txt          # Root build configuration
 ├── README.md               # This file
+├── plugins.ts              # Central TypeScript exports
 ├── compressor/             # Compressor plugin
 │   ├── CMakeLists.txt
 │   ├── README.md
+│   ├── compressor-plugin.ts
 │   ├── include/
 │   ├── src/
 │   └── tests/
-└── eq/                     # EQ plugin
+├── eq/                     # EQ plugin
+│   ├── CMakeLists.txt
+│   ├── README.md
+│   ├── eq-plugin.ts
+│   ├── include/
+│   ├── src/
+│   ├── tests/
+│   └── web-ui/            # Web-based EQ editor
+├── limiter/                # Limiter plugin
+│   ├── CMakeLists.txt
+│   ├── README.md
+│   ├── limiter-plugin.ts
+│   ├── include/
+│   ├── src/
+│   └── tests/
+└── delay/                  # Delay plugin
     ├── CMakeLists.txt
     ├── README.md
+    ├── delay-plugin.ts
     ├── include/
     ├── src/
     └── tests/
@@ -137,15 +171,19 @@ ctest -C Release --output-on-failure
 # Run tests for a specific plugin
 ctest -C Release -R Compressor
 ctest -C Release -R Eq
+ctest -C Release -R Limiter
+ctest -C Release -R Delay
 ```
 
 ## Technical Details
 
-- **Format**: CLAP (CLever Audio Plugin)
+- **Format**: CLAP (CLever Audio Plugin) 1.2.7
 - **Language**: C++20
 - **Build System**: CMake 3.20+
-- **Testing**: Google Test
+- **Testing**: Google Test 1.14.0
 - **Dependencies**: Automatically fetched via CMake FetchContent
+- **Parameter Architecture**: All parameters normalized to 0..1 range for DAW automation compatibility
+- **TypeScript Integration**: Each plugin includes TypeScript definitions with conversion functions for web/host integration
 
 ## License
 

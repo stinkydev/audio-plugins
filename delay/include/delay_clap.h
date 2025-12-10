@@ -15,10 +15,7 @@ namespace stinky_delay {
 
 enum DelayParamId {
   kParamIdDelayTime = 0,
-  kParamIdFeedback,
   kParamIdMix,
-  kParamIdStereoOffset,
-  kParamIdSyncToTempo,
   kParamIdCount
 };
 

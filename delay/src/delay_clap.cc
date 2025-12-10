@@ -18,7 +18,7 @@ constexpr const char* kPluginVendor = "Stinky";
 constexpr const char* kPluginUrl = "https://github.com/stinkydev/audio-plugins";
 constexpr const char* kPluginVersion = "1.0.0";
 constexpr const char* kPluginDescription = 
-    "High-quality stereo delay with feedback and stereo offset";
+    "Simple stereo delay effect";
 
 constexpr const char* kFeatures[] = {
     CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
@@ -30,12 +30,8 @@ constexpr const char* kFeatures[] = {
 // Parameter ranges (actual units)
 constexpr double kDelayTimeMin = 0.0;
 constexpr double kDelayTimeMax = 2000.0;
-constexpr double kFeedbackMin = 0.0;
-constexpr double kFeedbackMax = 0.99;
 constexpr double kMixMin = 0.0;
 constexpr double kMixMax = 1.0;
-constexpr double kStereoOffsetMin = -500.0;
-constexpr double kStereoOffsetMax = 500.0;
 
 // Conversion functions from normalized [0,1] to actual values
 inline double NormalizedToDelayTime(double norm) {
@@ -46,28 +42,12 @@ inline double DelayTimeToNormalized(double ms) {
   return (ms - kDelayTimeMin) / (kDelayTimeMax - kDelayTimeMin);
 }
 
-inline double NormalizedToFeedback(double norm) {
-  return kFeedbackMin + norm * (kFeedbackMax - kFeedbackMin);
-}
-
-inline double FeedbackToNormalized(double value) {
-  return (value - kFeedbackMin) / (kFeedbackMax - kFeedbackMin);
-}
-
 inline double NormalizedToMix(double norm) {
   return kMixMin + norm * (kMixMax - kMixMin);
 }
 
 inline double MixToNormalized(double value) {
   return (value - kMixMin) / (kMixMax - kMixMin);
-}
-
-inline double NormalizedToStereoOffset(double norm) {
-  return kStereoOffsetMin + norm * (kStereoOffsetMax - kStereoOffsetMin);
-}
-
-inline double StereoOffsetToNormalized(double ms) {
-  return (ms - kStereoOffsetMin) / (kStereoOffsetMax - kStereoOffsetMin);
 }
 
 // CLAP plugin callbacks
@@ -219,11 +199,8 @@ DelayClap::DelayClap(const clap_host_t* host)
   plugin_.on_main_thread = ClapOnMainThread;
 
   // Initialize parameters to normalized defaults
-  param_values_[kParamIdDelayTime].store(DelayTimeToNormalized(500.0));
-  param_values_[kParamIdFeedback].store(FeedbackToNormalized(0.5));
-  param_values_[kParamIdMix].store(MixToNormalized(0.5));
-  param_values_[kParamIdStereoOffset].store(StereoOffsetToNormalized(0.0));
-  param_values_[kParamIdSyncToTempo].store(0.0);
+  param_values_[kParamIdDelayTime].store(DelayTimeToNormalized(0.0));
+  param_values_[kParamIdMix].store(MixToNormalized(1.0));
 }
 
 bool DelayClap::Init() noexcept {
@@ -322,36 +299,14 @@ bool DelayClap::ParamsInfo(uint32_t param_index,
       std::snprintf(info->module, sizeof(info->module), "");
       info->min_value = 0.0;
       info->max_value = 1.0;
-      info->default_value = DelayTimeToNormalized(500.0);
-      break;
-    case kParamIdFeedback:
-      std::snprintf(info->name, sizeof(info->name), "Feedback");
-      std::snprintf(info->module, sizeof(info->module), "");
-      info->min_value = 0.0;
-      info->max_value = 1.0;
-      info->default_value = FeedbackToNormalized(0.5);
+      info->default_value = DelayTimeToNormalized(0.0);
       break;
     case kParamIdMix:
       std::snprintf(info->name, sizeof(info->name), "Mix");
       std::snprintf(info->module, sizeof(info->module), "");
       info->min_value = 0.0;
       info->max_value = 1.0;
-      info->default_value = MixToNormalized(0.5);
-      break;
-    case kParamIdStereoOffset:
-      std::snprintf(info->name, sizeof(info->name), "Stereo Offset");
-      std::snprintf(info->module, sizeof(info->module), "");
-      info->min_value = 0.0;
-      info->max_value = 1.0;
-      info->default_value = StereoOffsetToNormalized(0.0);
-      break;
-    case kParamIdSyncToTempo:
-      std::snprintf(info->name, sizeof(info->name), "Sync to Tempo");
-      std::snprintf(info->module, sizeof(info->module), "");
-      info->min_value = 0.0;
-      info->max_value = 1.0;
-      info->default_value = 0.0;
-      info->flags = CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED;
+      info->default_value = MixToNormalized(1.0);
       break;
     default:
       return false;
@@ -374,17 +329,8 @@ bool DelayClap::ParamsValueToText(clap_id param_id, double value,
     case kParamIdDelayTime:
       std::snprintf(display, size, "%.1f ms", NormalizedToDelayTime(value));
       break;
-    case kParamIdFeedback:
-      std::snprintf(display, size, "%.1f%%", NormalizedToFeedback(value) * 100.0);
-      break;
     case kParamIdMix:
       std::snprintf(display, size, "%.1f%%", NormalizedToMix(value) * 100.0);
-      break;
-    case kParamIdStereoOffset:
-      std::snprintf(display, size, "%.1f ms", NormalizedToStereoOffset(value));
-      break;
-    case kParamIdSyncToTempo:
-      std::snprintf(display, size, "%s", value > 0.5 ? "On" : "Off");
       break;
     default:
       return false;
@@ -410,17 +356,8 @@ bool DelayClap::ParamsTextToValue(clap_id param_id, const char* display,
     case kParamIdDelayTime:
       *value = DelayTimeToNormalized(std::clamp(parsed_value, kDelayTimeMin, kDelayTimeMax));
       break;
-    case kParamIdFeedback:
-      *value = FeedbackToNormalized(std::clamp(parsed_value, kFeedbackMin, kFeedbackMax));
-      break;
     case kParamIdMix:
       *value = MixToNormalized(std::clamp(parsed_value, kMixMin, kMixMax));
-      break;
-    case kParamIdStereoOffset:
-      *value = StereoOffsetToNormalized(std::clamp(parsed_value, kStereoOffsetMin, kStereoOffsetMax));
-      break;
-    case kParamIdSyncToTempo:
-      *value = std::clamp(parsed_value, 0.0, 1.0);
       break;
     default:
       return false;
@@ -478,10 +415,7 @@ void DelayClap::ProcessParameterChanges(const clap_input_events_t* events) noexc
 void DelayClap::UpdateProcessorParams() noexcept {
   DelayParams params;
   params.delay_time_ms = static_cast<float>(NormalizedToDelayTime(param_values_[kParamIdDelayTime].load()));
-  params.feedback = static_cast<float>(NormalizedToFeedback(param_values_[kParamIdFeedback].load()));
   params.mix = static_cast<float>(NormalizedToMix(param_values_[kParamIdMix].load()));
-  params.stereo_offset_ms = static_cast<float>(NormalizedToStereoOffset(param_values_[kParamIdStereoOffset].load()));
-  params.sync_to_tempo = param_values_[kParamIdSyncToTempo].load() > 0.5;
   
   processor_.SetParams(params);
 }

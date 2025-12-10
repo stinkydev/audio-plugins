@@ -66,7 +66,7 @@ TEST_F(ClapDelayPluginTest, ResetSucceeds) {
 }
 
 TEST_F(ClapDelayPluginTest, ParamsCountReturnsCorrectValue) {
-  EXPECT_EQ(plugin_->ParamsCount(), 5u);
+  EXPECT_EQ(plugin_->ParamsCount(), 2u);
 }
 
 TEST_F(ClapDelayPluginTest, ParamsInfoReturnsValidInfo) {
@@ -78,16 +78,7 @@ TEST_F(ClapDelayPluginTest, ParamsInfoReturnsValidInfo) {
   EXPECT_EQ(info.max_value, 1.0);
   
   EXPECT_TRUE(plugin_->ParamsInfo(1, &info));
-  EXPECT_STREQ(info.name, "Feedback");
-  
-  EXPECT_TRUE(plugin_->ParamsInfo(2, &info));
   EXPECT_STREQ(info.name, "Mix");
-  
-  EXPECT_TRUE(plugin_->ParamsInfo(3, &info));
-  EXPECT_STREQ(info.name, "Stereo Offset");
-  
-  EXPECT_TRUE(plugin_->ParamsInfo(4, &info));
-  EXPECT_STREQ(info.name, "Sync to Tempo");
 }
 
 TEST_F(ClapDelayPluginTest, ParamsInfoOutOfBoundsReturnsFalse) {
@@ -102,13 +93,7 @@ TEST_F(ClapDelayPluginTest, ParamsValueToTextFormatsCorrectly) {
   EXPECT_STREQ(display, "500.0 ms");
   
   EXPECT_TRUE(plugin_->ParamsValueToText(1, 0.5, display, sizeof(display)));
-  EXPECT_STREQ(display, "49.5%");
-  
-  EXPECT_TRUE(plugin_->ParamsValueToText(2, 0.5, display, sizeof(display)));
   EXPECT_STREQ(display, "50.0%");
-  
-  EXPECT_TRUE(plugin_->ParamsValueToText(4, 1.0, display, sizeof(display)));
-  EXPECT_STREQ(display, "On");
 }
 
 TEST_F(ClapDelayPluginTest, GetExtensionReturnsValidPointers) {

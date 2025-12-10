@@ -10,11 +10,8 @@
 namespace stinky_delay {
 
 struct DelayParams {
-  float delay_time_ms = 500.0f;  // 0 to 2000 ms
-  float feedback = 0.5f;          // 0.0 to 1.0
-  float mix = 0.5f;               // 0.0 to 1.0 (dry/wet)
-  float stereo_offset_ms = 0.0f;  // -500 to 500 ms
-  bool sync_to_tempo = false;
+  float delay_time_ms = 0.0f;  // 0 to 2000 ms
+  float mix = 1.0f;            // 0.0 to 1.0 (dry/wet)
 };
 
 class DelayProcessor {
