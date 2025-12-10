@@ -6,11 +6,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Global options
-option(BUILD_COMPRESSOR "Build Sesame Compressor plugin" ON)
-option(BUILD_EQ "Build Sesame EQ plugin" ON)
-option(BUILD_LIMITER "Build Sesame Limiter plugin" ON)
+option(BUILD_COMPRESSOR "Build Stinky Compressor plugin" ON)
+option(BUILD_EQ "Build Stinky EQ plugin" ON)
+option(BUILD_LIMITER "Build Stinky Limiter plugin" ON)
+option(BUILD_DELAY "Build Stinky Delay plugin" ON)
 option(BUILD_TESTS "Build test suite for all plugins" ON)
-option(ENABLE_SIMD "Enable SIMD optimizations (compressor)" ON)
+option(ENABLE_SIMD "Enable SIMD optimizations (compressor, limiter)" ON)
 
 # Fetch CLAP SDK once for all plugins
 include(FetchContent)
@@ -43,6 +44,10 @@ endif()
 
 if(BUILD_LIMITER)
     add_subdirectory(limiter)
+endif()
+
+if(BUILD_DELAY)
+    add_subdirectory(delay)
 endif()
 
 # Print build summary

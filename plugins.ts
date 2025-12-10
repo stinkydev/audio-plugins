@@ -23,14 +23,17 @@ export interface IAudioPlugin {
 export { CompressorPlugin } from './compressor/compressor-plugin';
 export { EqPlugin, FilterType } from './eq/eq-plugin';
 export { LimiterPlugin } from './limiter/limiter-plugin';
+export { DelayPlugin } from './delay/delay-plugin';
 
 // Export all plugins as an array
 import { CompressorPlugin } from './compressor/compressor-plugin';
 import { EqPlugin } from './eq/eq-plugin';
 import { LimiterPlugin } from './limiter/limiter-plugin';
+import { DelayPlugin } from './delay/delay-plugin';
 
 export const AllPlugins: IAudioPlugin[] = [
   CompressorPlugin,
   EqPlugin,
-  LimiterPlugin
+  LimiterPlugin,
+  DelayPlugin
 ];
