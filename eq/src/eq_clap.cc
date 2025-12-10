@@ -359,12 +359,12 @@ bool EqClap::ParamsInfo(uint32_t param_index,
       case 0:  // Type
         std::snprintf(info->name, sizeof(info->name), "Band %d Type", band);
         std::snprintf(info->module, sizeof(info->module), "Band %d", band);
-        info->min_value = 0.0;
-        info->max_value = 4.0;  // 5 filter types: HighPass, Peak, LowShelf, HighShelf, LowPass
+        info->min_value = 0.0;  // Integer enum: 0 = Low Cut
+        info->max_value = 4.0;  // Integer enum: 4 = High Cut
         info->default_value = (band == 1 || band == 4) ? 
             static_cast<double>(band == 1 ? FilterType::kLowShelf : FilterType::kHighShelf) :
             static_cast<double>(FilterType::kBell);
-        info->flags = CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED;
+        info->flags = CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED | CLAP_PARAM_IS_ENUM;
         break;
       case 1:  // Frequency
         std::snprintf(info->name, sizeof(info->name), "Band %d Frequency", band);
@@ -433,12 +433,13 @@ bool EqClap::ParamsValueToText(clap_id param_id, double value,
     const int param_type = get_param_type(param_id);
     
     switch (param_type) {
-      case 0:  // Type
+      case 0:  // Type (enum parameter - integer values 0-4)
         {
           const char* type_names[] = {
             "Low Cut", "Bell", "Low Shelf", "High Shelf", "High Cut"
           };
-          const int type_idx = static_cast<int>(value);
+          // Round to nearest integer for enum parameter
+          const int type_idx = static_cast<int>(std::round(value));
           if (type_idx >= 0 && type_idx < 5) {
             std::snprintf(display, size, "%s", type_names[type_idx]);
           } else {

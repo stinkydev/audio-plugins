@@ -9,7 +9,9 @@ export interface IAudioPluginParam {
   max?: number;
   defaultValue: number;
   getDisplayValue?: (value: number) => number;
-  type: 'float' | 'bool';
+  getDisplayText?: (value: number) => string;
+  enumValues?: { value: number; label: string }[];
+  type: 'float' | 'bool' | 'enum';
 }
 
 export interface IAudioPlugin {

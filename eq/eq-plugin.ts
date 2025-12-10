@@ -9,7 +9,9 @@ export interface IAudioPluginParam {
   max?: number;
   defaultValue: number;
   getDisplayValue?: (value: number) => number;
-  type: 'float' | 'bool';
+  getDisplayText?: (value: number) => string;
+  enumValues?: { value: number; label: string }[];
+  type: 'float' | 'bool' | 'enum';
 }
 
 export interface IAudioPlugin {
@@ -71,6 +73,15 @@ function outputGainToNormalized(db: number): number {
   return (db - OUTPUT_GAIN_MIN) / (OUTPUT_GAIN_MAX - OUTPUT_GAIN_MIN);
 }
 
+// Helper to get filter type display text
+function filterTypeToText(value: number): string {
+  const type_names = [
+    'Low Cut', 'Bell', 'Low Shelf', 'High Shelf', 'High Cut'
+  ];
+  const idx = Math.round(value);
+  return (idx >= 0 && idx < type_names.length) ? type_names[idx] : 'Unknown';
+}
+
 // Helper to create band parameters
 function createBandParams(bandIndex: number): IAudioPluginParam[] {
   const bandNum = bandIndex + 1;
@@ -86,7 +97,15 @@ function createBandParams(bandIndex: number): IAudioPluginParam[] {
       min: 0,
       max: 4,
       defaultValue: defaultTypes[bandIndex],
-      type: 'float' // Stepped parameter
+      getDisplayText: filterTypeToText,
+      enumValues: [
+        { value: FilterType.kLowCut, label: 'Low Cut' },
+        { value: FilterType.kBell, label: 'Bell' },
+        { value: FilterType.kLowShelf, label: 'Low Shelf' },
+        { value: FilterType.kHighShelf, label: 'High Shelf' },
+        { value: FilterType.kHighCut, label: 'High Cut' }
+      ],
+      type: 'enum'
     },
     {
       id: `band${bandNum}Freq`,
