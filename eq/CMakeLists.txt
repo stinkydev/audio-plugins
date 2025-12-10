@@ -1,16 +1,11 @@
-# SesameCompressor Plugin
-project(SesameCompressor VERSION 1.0.0 LANGUAGES CXX)
+# SesameEQ Plugin
+project(SesameEQ VERSION 1.0.0 LANGUAGES CXX)
 
 # Use parent's C++ standard if not set
 if(NOT CMAKE_CXX_STANDARD)
     set(CMAKE_CXX_STANDARD 20)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CMAKE_CXX_EXTENSIONS OFF)
-endif()
-
-# Build options (use parent option if available)
-if(NOT DEFINED ENABLE_SIMD)
-    option(ENABLE_SIMD "Enable SIMD optimizations" ON)
 endif()
 
 # Fetch CLAP SDK only if not already available
@@ -27,29 +22,19 @@ endif()
 # Platform-specific settings
 if(MSVC)
     add_compile_options(/W4 /WX)
-    if(ENABLE_SIMD)
-        add_compile_options(/arch:AVX2)
-        add_compile_definitions(USE_SIMD=1)
-    endif()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra -Wpedantic -Werror)
-    if(ENABLE_SIMD)
-        add_compile_options(-mavx2 -mfma)
-        add_compile_definitions(USE_SIMD=1)
-    endif()
 endif()
 
 # Source files
 set(SOURCES
-    src/compressor_processor.cc
-    src/compressor_clap.cc
-    src/simd_utils.cc
+    src/eq_processor.cc
+    src/eq_clap.cc
 )
 
 set(HEADERS
-    include/compressor_processor.h
-    include/compressor_clap.h
-    include/simd_utils.h
+    include/eq_processor.h
+    include/eq_clap.h
 )
 
 # Create the CLAP plugin as a shared library
@@ -106,46 +91,44 @@ if(BUILD_TESTS)
     
     # Test sources
     set(TEST_SOURCES
-        tests/test_compressor_processor.cc
-        tests/test_simd_utils.cc
+        tests/test_eq_processor.cc
         tests/test_clap_plugin.cc
     )
     
     # Create test executable
-    add_executable(CompressorTests ${TEST_SOURCES})
+    add_executable(EqTests ${TEST_SOURCES})
     
-    target_link_libraries(CompressorTests
+    target_link_libraries(EqTests
         PRIVATE
             gtest_main
             gmock
     )
     
-    target_include_directories(CompressorTests
+    target_include_directories(EqTests
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${clap_SOURCE_DIR}/include
     )
     
     # Link test with source files (not the plugin library)
-    target_sources(CompressorTests
+    target_sources(EqTests
         PRIVATE
-            src/compressor_processor.cc
-            src/compressor_clap.cc
-            src/simd_utils.cc
+            src/eq_processor.cc
+            src/eq_clap.cc
     )
     
-    target_compile_definitions(CompressorTests
+    target_compile_definitions(EqTests
         PRIVATE
             ${PROJECT_NAME}_EXPORTS
     )
     
     if(MSVC)
-        target_compile_options(CompressorTests PRIVATE /W4)
+        target_compile_options(EqTests PRIVATE /W4)
     else()
-        target_compile_options(CompressorTests PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(EqTests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     
     # Register tests with CTest
     include(GoogleTest)
-    gtest_discover_tests(CompressorTests)
+    gtest_discover_tests(EqTests)
 endif()
