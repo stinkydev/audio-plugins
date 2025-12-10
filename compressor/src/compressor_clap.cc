@@ -14,7 +14,7 @@ namespace {
 
 constexpr const char* kPluginId = "com.sesame.compressor";
 constexpr const char* kPluginName = "Sesame Compressor";
-constexpr const char* kPluginVendor = "Stinky Computing AB";
+constexpr const char* kPluginVendor = "Stinky Computing";
 constexpr const char* kPluginUrl = "https://github.com/fastcompressor";
 constexpr const char* kPluginVersion = "1.0.0";
 constexpr const char* kPluginDescription = 
@@ -31,11 +31,11 @@ constexpr const char* kFeatures[] = {
 constexpr double kThresholdMin = -60.0;
 constexpr double kThresholdMax = 0.0;
 constexpr double kRatioMin = 1.0;
-constexpr double kRatioMax = 20.0;
-constexpr double kAttackMin = 0.1;
-constexpr double kAttackMax = 100.0;
+constexpr double kRatioMax = 100.0;
+constexpr double kAttackMin = 0.05;
+constexpr double kAttackMax = 250.0;
 constexpr double kReleaseMin = 10.0;
-constexpr double kReleaseMax = 1000.0;
+constexpr double kReleaseMax = 2500.0;
 constexpr double kKneeMin = 0.0;
 constexpr double kKneeMax = 12.0;
 constexpr double kMakeupMin = -12.0;
@@ -153,6 +153,23 @@ static const clap_plugin_state_t kStateExtension = {
     ClapStateLoad,
 };
 
+// Audio ports extension callbacks
+uint32_t ClapAudioPortsCount(const clap_plugin_t* plugin, bool is_input) {
+  auto* comp = static_cast<CompressorClap*>(plugin->plugin_data);
+  return comp->AudioPortsCount(is_input);
+}
+
+bool ClapAudioPortsGet(const clap_plugin_t* plugin, uint32_t index,
+                       bool is_input, clap_audio_port_info_t* info) {
+  auto* comp = static_cast<CompressorClap*>(plugin->plugin_data);
+  return comp->AudioPortsGet(index, is_input, info);
+}
+
+static const clap_plugin_audio_ports_t kAudioPortsExtension = {
+    ClapAudioPortsCount,
+    ClapAudioPortsGet,
+};
+
 }  // namespace
 
 CompressorClap::CompressorClap(const clap_host_t* host)
@@ -179,6 +196,7 @@ CompressorClap::CompressorClap(const clap_host_t* host)
   param_values_[kParamIdRelease].store(50.0);
   param_values_[kParamIdKnee].store(0.0);
   param_values_[kParamIdMakeupGain].store(0.0);
+  param_values_[kParamIdAutoMakeup].store(0.0);
 }
 
 bool CompressorClap::Init() noexcept {
@@ -190,6 +208,7 @@ bool CompressorClap::Activate(double sample_rate, uint32_t /*min_frames*/,
                                uint32_t /*max_frames*/) noexcept {
   sample_rate_ = sample_rate;
   processor_.Initialize(sample_rate);
+  UpdateProcessorParams();  // Sync stored parameter values with processor
   return true;
 }
 
@@ -225,23 +244,35 @@ clap_process_status CompressorClap::Process(
     return CLAP_PROCESS_SLEEP;
   }
 
-  // Get stereo channels
+  // Get input/output channels (handle both mono and stereo)
+  const uint32_t in_channels = process->audio_inputs[0].channel_count;
+  const uint32_t out_channels = process->audio_outputs[0].channel_count;
+  
   float* in_left = process->audio_inputs[0].data32[0];
-  float* in_right = process->audio_inputs[0].data32[1];
+  float* in_right = (in_channels > 1) ? process->audio_inputs[0].data32[1] : nullptr;
   float* out_left = process->audio_outputs[0].data32[0];
-  float* out_right = process->audio_outputs[0].data32[1];
+  float* out_right = (out_channels > 1) ? process->audio_outputs[0].data32[1] : nullptr;
 
   // Copy input to output
   std::memcpy(out_left, in_left, frame_count * sizeof(float));
-  std::memcpy(out_right, in_right, frame_count * sizeof(float));
+  if (in_right && out_right) {
+    std::memcpy(out_right, in_right, frame_count * sizeof(float));
+  }
 
   // Process compression
-  processor_.ProcessStereo(out_left, out_right, frame_count);
+  if (out_right) {
+    processor_.ProcessStereo(out_left, out_right, frame_count);
+  } else {
+    processor_.ProcessStereo(out_left, out_left, frame_count);
+  }
 
   return CLAP_PROCESS_CONTINUE;
 }
 
 const void* CompressorClap::GetExtension(const char* id) noexcept {
+  if (std::strcmp(id, CLAP_EXT_AUDIO_PORTS) == 0) {
+    return &kAudioPortsExtension;
+  }
   if (std::strcmp(id, CLAP_EXT_PARAMS) == 0) {
     return &kParamsExtension;
   }
@@ -306,6 +337,14 @@ bool CompressorClap::ParamsInfo(uint32_t param_index,
       info->max_value = kMakeupMax;
       info->default_value = 0.0;
       break;
+    case kParamIdAutoMakeup:
+      std::snprintf(info->name, sizeof(info->name), "Auto Makeup");
+      std::snprintf(info->module, sizeof(info->module), "");
+      info->min_value = 0.0;
+      info->max_value = 1.0;
+      info->default_value = 0.0;
+      info->flags = CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED;
+      break;
     default:
       return false;
   }
@@ -336,6 +375,9 @@ bool CompressorClap::ParamsValueToText(clap_id param_id, double value,
     case kParamIdAttack:
     case kParamIdRelease:
       std::snprintf(display, size, "%.1f ms", value);
+      break;
+    case kParamIdAutoMakeup:
+      std::snprintf(display, size, "%s", value > 0.5 ? "On" : "Off");
       break;
     default:
       return false;
@@ -419,6 +461,7 @@ void CompressorClap::UpdateProcessorParams() noexcept {
   params.release_ms = static_cast<float>(param_values_[kParamIdRelease].load());
   params.knee_db = static_cast<float>(param_values_[kParamIdKnee].load());
   params.makeup_gain_db = static_cast<float>(param_values_[kParamIdMakeupGain].load());
+  params.auto_makeup = param_values_[kParamIdAutoMakeup].load() > 0.5;
   
   processor_.SetParams(params);
 }
@@ -427,6 +470,24 @@ void CompressorClap::SetParamValue(clap_id param_id, double value) noexcept {
   if (param_id < kParamIdCount) {
     param_values_[param_id].store(value);
   }
+}
+
+uint32_t CompressorClap::AudioPortsCount(bool /*is_input*/) const noexcept {
+  return 1;  // One stereo port for input and one for output
+}
+
+bool CompressorClap::AudioPortsGet(uint32_t index, bool is_input,
+                                   clap_audio_port_info_t* info) const noexcept {
+  if (index > 0) return false;
+
+  info->id = 0;
+  std::snprintf(info->name, sizeof(info->name), is_input ? "Audio Input" : "Audio Output");
+  info->channel_count = 2;
+  info->flags = CLAP_AUDIO_PORT_IS_MAIN;
+  info->port_type = CLAP_PORT_STEREO;
+  info->in_place_pair = is_input ? 0 : 0;
+
+  return true;
 }
 
 }  // namespace fast_compressor

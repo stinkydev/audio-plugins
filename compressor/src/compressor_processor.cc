@@ -30,11 +30,16 @@ CompressorProcessor::CompressorProcessor()
       envelope_gain_(1.0f),
       gain_reduction_db_(0.0f),
       attack_coeff_(0.0f),
-      release_coeff_(0.0f) {}
+      release_coeff_(0.0f),
+      c_dev_(0.0f),
+      alpha_avg_(0.0f) {}
 
 void CompressorProcessor::Initialize(double sample_rate) {
   sample_rate_ = sample_rate;
   Reset();
+  
+  // Calculate averaging filter coefficient for 2 second time constant
+  alpha_avg_ = std::exp(-1.0f / (static_cast<float>(sample_rate) * 2.0f));
   
   // Recalculate coefficients
   SetParams(params_);
@@ -53,6 +58,7 @@ void CompressorProcessor::SetParams(const CompressorParams& params) {
 void CompressorProcessor::Reset() {
   envelope_gain_ = 1.0f;
   gain_reduction_db_ = 0.0f;
+  c_dev_ = 0.0f;
 }
 
 float CompressorProcessor::CalculateGainReduction(float input_level_db) const {
@@ -113,7 +119,9 @@ void CompressorProcessor::Process(float* buffer, size_t num_frames) {
 
 void CompressorProcessor::ProcessStereo(float* left, float* right, 
                                         size_t num_frames) {
-  const float makeup_gain = DbToLinear(params_.makeup_gain_db);
+  // Calculate c_est (estimated average gain reduction in dB)
+  // This is half the maximum gain reduction at threshold
+  const float c_est = params_.threshold_db * (1.0f - 1.0f / params_.ratio) / 2.0f;
   
   for (size_t i = 0; i < num_frames; ++i) {
     // Get peak level from stereo pair
@@ -124,17 +132,33 @@ void CompressorProcessor::ProcessStereo(float* left, float* right,
     // Convert to dB
     const float peak_db = LinearToDb(peak);
     
-    // Calculate target gain reduction
-    const float gain_reduction = CalculateGainReduction(peak_db);
-    const float target_gain = DbToLinear(gain_reduction);
+    // Calculate target gain reduction in dB (this is negative or zero)
+    const float gain_reduction_db = CalculateGainReduction(peak_db);
+    const float target_gain = DbToLinear(gain_reduction_db);
     
     // Apply envelope
     envelope_gain_ = ApplyEnvelope(target_gain, envelope_gain_);
     
-    // Store gain reduction for metering
+    // Store gain reduction for metering (convert back to dB, will be negative)
     gain_reduction_db_ = LinearToDb(envelope_gain_);
     
-    // Apply gain and makeup
+    // Calculate makeup gain
+    float makeup_gain_db;
+    if (params_.auto_makeup) {
+      // Update averaging filter for auto makeup
+      // Note: gain_reduction_db_ is negative, so we use it directly
+      c_dev_ = alpha_avg_ * c_dev_ + (1.0f - alpha_avg_) * (gain_reduction_db_ - c_est);
+      
+      // Auto makeup gain compensates for both the estimate and actual deviation
+      // Since c_est and c_dev are negative, negating them gives positive makeup gain
+      makeup_gain_db = -(c_dev_ + c_est);
+    } else {
+      makeup_gain_db = params_.makeup_gain_db;
+    }
+    
+    const float makeup_gain = DbToLinear(makeup_gain_db);
+    
+    // Apply compression gain and makeup
     const float final_gain = envelope_gain_ * makeup_gain;
     left[i] *= final_gain;
     right[i] *= final_gain;

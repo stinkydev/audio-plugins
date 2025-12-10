@@ -21,6 +21,7 @@ enum CompressorParamId {
   kParamIdRelease,
   kParamIdKnee,
   kParamIdMakeupGain,
+  kParamIdAutoMakeup,
   kParamIdCount
 };
 
@@ -59,6 +60,11 @@ class CompressorClap {
   // State extension
   bool StateSave(const clap_ostream_t* stream) noexcept;
   bool StateLoad(const clap_istream_t* stream) noexcept;
+
+  // Audio ports extension
+  uint32_t AudioPortsCount(bool is_input) const noexcept;
+  bool AudioPortsGet(uint32_t index, bool is_input,
+                     clap_audio_port_info_t* info) const noexcept;
 
   const clap_plugin_t* ClapPlugin() noexcept { return &plugin_; }
 

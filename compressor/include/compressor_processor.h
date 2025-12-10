@@ -17,6 +17,7 @@ struct CompressorParams {
   float release_ms = 50.0f;      // Release time in milliseconds
   float knee_db = 0.0f;          // Knee width in dB (0 = hard knee)
   float makeup_gain_db = 0.0f;   // Output makeup gain in dB
+  bool auto_makeup = false;      // Auto makeup gain enabled
 };
 
 // Fast audio compressor with SIMD optimization
@@ -59,6 +60,10 @@ class CompressorProcessor {
   float gain_reduction_db_;
   float attack_coeff_;
   float release_coeff_;
+  
+  // Auto makeup gain state
+  float c_dev_;  // Average deviation of gain reduction
+  float alpha_avg_;  // Averaging filter coefficient (2 second time constant)
 };
 
 }  // namespace fast_compressor
