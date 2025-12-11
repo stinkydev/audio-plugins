@@ -50,6 +50,25 @@ if(BUILD_DELAY)
     add_subdirectory(delay)
 endif()
 
+# Generate TypeScript definitions from C++ annotations
+find_program(NODE_EXECUTABLE NAMES node nodejs)
+if(NODE_EXECUTABLE)
+    add_custom_target(generate_typescript
+        COMMAND ${NODE_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/generate-from-annotations.js
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Generating TypeScript plugin definitions from C++ annotations"
+        SOURCES
+            ${CMAKE_SOURCE_DIR}/scripts/generate-from-annotations.js
+            ${CMAKE_SOURCE_DIR}/compressor/include/compressor_clap.h
+            ${CMAKE_SOURCE_DIR}/delay/include/delay_clap.h
+            ${CMAKE_SOURCE_DIR}/eq/include/eq_clap.h
+            ${CMAKE_SOURCE_DIR}/limiter/include/limiter_clap.h
+    )
+    message(STATUS "TypeScript generation target added (run: cmake --build . --target generate_typescript)")
+else()
+    message(WARNING "Node.js not found - TypeScript generation target will not be available")
+endif()
+
 # Print build summary
 message(STATUS "")
 message(STATUS "═══════════════════════════════════════")

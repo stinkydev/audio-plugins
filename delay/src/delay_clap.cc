@@ -27,12 +27,6 @@ constexpr const char* kFeatures[] = {
     nullptr
 };
 
-// Parameter ranges (actual units)
-constexpr double kDelayTimeMin = 0.0;
-constexpr double kDelayTimeMax = 1000.0;
-constexpr double kMixMin = 0.0;
-constexpr double kMixMax = 1.0;
-
 // Conversion functions from normalized [0,1] to actual values
 inline double NormalizedToDelayTime(double norm) {
   return kDelayTimeMin + norm * (kDelayTimeMax - kDelayTimeMin);

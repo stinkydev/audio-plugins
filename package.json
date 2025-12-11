@@ -1,0 +1,11 @@
+{
+  "name": "audio-plugins",
+  "version": "1.0.0",
+  "description": "High-performance audio plugins with CLAP support",
+  "scripts": {
+    "generate:ts": "node scripts/generate-from-annotations.js"
+  },
+  "keywords": ["audio", "clap", "plugins", "dsp"],
+  "author": "stinkydev",
+  "license": "MIT"
+}

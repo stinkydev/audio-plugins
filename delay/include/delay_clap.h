@@ -13,9 +13,21 @@
 
 namespace stinky_delay {
 
+// @ts-plugin-meta
+// name: Delay
+// id: com.stinky.delay
+// filename: StinkyDelay.clap
+// description: Simple stereo delay effect
+
+// Parameter ranges (actual units)
+constexpr double kDelayTimeMin = 0.0;
+constexpr double kDelayTimeMax = 1000.0;
+constexpr double kMixMin = 0.0;
+constexpr double kMixMax = 1.0;
+
 enum DelayParamId {
-  kParamIdDelayTime = 100,
-  kParamIdMix,
+  kParamIdDelayTime = 100,  // @ts-param min=0.0 max=1000.0 default=0.0 unit=ms label="Delay Time"
+  kParamIdMix,              // @ts-param min=0.0 max=1.0 default=1.0 unit=% label="Mix"
   kParamIdCount
 };
 

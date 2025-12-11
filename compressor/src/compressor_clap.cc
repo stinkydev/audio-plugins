@@ -27,20 +27,6 @@ constexpr const char* kFeatures[] = {
     nullptr
 };
 
-// Parameter ranges (actual units)
-constexpr double kThresholdMin = -60.0;
-constexpr double kThresholdMax = 0.0;
-constexpr double kRatioMin = 1.0;
-constexpr double kRatioMax = 100.0;
-constexpr double kAttackMin = 0.05;
-constexpr double kAttackMax = 250.0;
-constexpr double kReleaseMin = 10.0;
-constexpr double kReleaseMax = 2500.0;
-constexpr double kKneeMin = 0.0;
-constexpr double kKneeMax = 12.0;
-constexpr double kMakeupMin = -12.0;
-constexpr double kMakeupMax = 24.0;
-
 // Convert normalized [0,1] to actual values
 inline double NormalizedToThreshold(double norm) {
   return kThresholdMin + norm * (kThresholdMax - kThresholdMin);

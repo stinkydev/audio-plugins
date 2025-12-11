@@ -13,15 +13,35 @@
 
 namespace fast_compressor {
 
+// @ts-plugin-meta
+// name: Compressor
+// id: com.stinky.compressor
+// filename: StinkyCompressor.clap
+// description: High-performance audio compressor with SIMD optimization
+
+// Parameter ranges (actual units)
+constexpr double kThresholdMin = -60.0;
+constexpr double kThresholdMax = 0.0;
+constexpr double kRatioMin = 1.0;
+constexpr double kRatioMax = 100.0;
+constexpr double kAttackMin = 0.05;
+constexpr double kAttackMax = 250.0;
+constexpr double kReleaseMin = 10.0;
+constexpr double kReleaseMax = 2500.0;
+constexpr double kKneeMin = 0.0;
+constexpr double kKneeMax = 12.0;
+constexpr double kMakeupMin = -12.0;
+constexpr double kMakeupMax = 24.0;
+
 // CLAP parameter IDs
 enum CompressorParamId {
-  kParamIdThreshold = 100,
-  kParamIdRatio,
-  kParamIdAttack,
-  kParamIdRelease,
-  kParamIdKnee,
-  kParamIdMakeupGain,
-  kParamIdAutoMakeup,
+  kParamIdThreshold = 100,  // @ts-param min=-60.0 max=0.0 default=-20.0 unit=dB label="Threshold"
+  kParamIdRatio,            // @ts-param min=1.0 max=100.0 default=4.0 unit=:1 label="Ratio" scale=log
+  kParamIdAttack,           // @ts-param min=0.05 max=250.0 default=5.0 unit=ms label="Attack" scale=log
+  kParamIdRelease,          // @ts-param min=10.0 max=2500.0 default=50.0 unit=ms label="Release" scale=log
+  kParamIdKnee,             // @ts-param min=0.0 max=12.0 default=0.0 unit=dB label="Knee"
+  kParamIdMakeupGain,       // @ts-param min=-12.0 max=24.0 default=0.0 unit=dB label="Makeup Gain"
+  kParamIdAutoMakeup,       // @ts-param default=0 label="Auto Makeup" type=bool
   kParamIdCount
 };
 

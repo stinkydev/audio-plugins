@@ -27,12 +27,6 @@ constexpr const char* kFeatures[] = {
     nullptr
 };
 
-// Parameter ranges
-constexpr double kThresholdMin = -60.0;
-constexpr double kThresholdMax = 0.0;
-constexpr double kOutputLevelMin = -60.0;
-constexpr double kOutputLevelMax = 0.0;
-
 // Conversion helper functions
 inline double NormalizedToThreshold(double norm) {
   return kThresholdMin + norm * (kThresholdMax - kThresholdMin);

@@ -13,39 +13,55 @@
 
 namespace fast_eq {
 
+// @ts-plugin-meta
+// name: Eq
+// id: com.stinky.eq
+// filename: SesameEQ.clap
+// description: High-quality 4-band parametric EQ with multiple filter types
+
+// Parameter ranges
+constexpr double kFreqMin = 20.0;
+constexpr double kFreqMax = 20000.0;
+constexpr double kGainMin = -24.0;
+constexpr double kGainMax = 24.0;
+constexpr double kQMin = 0.1;
+constexpr double kQMax = 10.0;
+constexpr double kOutputGainMin = -12.0;
+constexpr double kOutputGainMax = 12.0;
+
 // CLAP parameter IDs
 enum EqParamId {
   // Band 1
-  kParamIdBand1Type = 100,
-  kParamIdBand1Freq,
-  kParamIdBand1Gain,
-  kParamIdBand1Q,
-  kParamIdBand1Enable,
+  kParamIdBand1Type = 100,  // @ts-param default=1 label="Band 1 Type" type=enum values="Low Cut,Bell,Low Shelf,High Shelf,High Cut"
+  kParamIdBand1Freq,        // @ts-param min=20.0 max=20000.0 default=100.0 unit=Hz label="Band 1 Frequency" scale=log
+  kParamIdBand1Gain,        // @ts-param min=-24.0 max=24.0 default=0.0 unit=dB label="Band 1 Gain"
+  kParamIdBand1Q,           // @ts-param min=0.1 max=10.0 default=0.707 label="Band 1 Q"
+  kParamIdBand1Enable,      // @ts-param default=1 label="Band 1 Enable" type=bool
   
   // Band 2
-  kParamIdBand2Type,
-  kParamIdBand2Freq,
-  kParamIdBand2Gain,
-  kParamIdBand2Q,
-  kParamIdBand2Enable,
+  kParamIdBand2Type,        // @ts-param default=1 label="Band 2 Type" type=enum values="Low Cut,Bell,Low Shelf,High Shelf,High Cut"
+  kParamIdBand2Freq,        // @ts-param min=20.0 max=20000.0 default=500.0 unit=Hz label="Band 2 Frequency" scale=log
+  kParamIdBand2Gain,        // @ts-param min=-24.0 max=24.0 default=0.0 unit=dB label="Band 2 Gain"
+  kParamIdBand2Q,           // @ts-param min=0.1 max=10.0 default=1.0 label="Band 2 Q"
+  kParamIdBand2Enable,      // @ts-param default=1 label="Band 2 Enable" type=bool
   
   // Band 3
-  kParamIdBand3Type,
-  kParamIdBand3Freq,
-  kParamIdBand3Gain,
-  kParamIdBand3Q,
-  kParamIdBand3Enable,
+  kParamIdBand3Type,        // @ts-param default=1 label="Band 3 Type" type=enum values="Low Cut,Bell,Low Shelf,High Shelf,High Cut"
+  kParamIdBand3Freq,        // @ts-param min=20.0 max=20000.0 default=2000.0 unit=Hz label="Band 3 Frequency" scale=log
+  kParamIdBand3Gain,        // @ts-param min=-24.0 max=24.0 default=0.0 unit=dB label="Band 3 Gain"
+  kParamIdBand3Q,           // @ts-param min=0.1 max=10.0 default=1.0 label="Band 3 Q"
+  kParamIdBand3Enable,      // @ts-param default=1 label="Band 3 Enable" type=bool
   
   // Band 4
-  kParamIdBand4Type,
-  kParamIdBand4Freq,
-  kParamIdBand4Gain,
-  kParamIdBand4Q,
-  kParamIdBand4Enable,
+  kParamIdBand4Type,        // @ts-param default=3 label="Band 4 Type" type=enum values="Low Cut,Bell,Low Shelf,High Shelf,High Cut"
+  kParamIdBand4Freq,        // @ts-param min=20.0 max=20000.0 default=8000.0 unit=Hz label="Band 4 Frequency" scale=log
+  kParamIdBand4Gain,        // @ts-param min=-24.0 max=24.0 default=0.0 unit=dB label="Band 4 Gain"
+  kParamIdBand4Q,           // @ts-param min=0.1 max=10.0 default=0.707 label="Band 4 Q"
+  kParamIdBand4Enable,      // @ts-param default=1 label="Band 4 Enable" type=bool
   
   // Global
-  kParamIdOutputGain,
-  kParamIdBypass,
+  kParamIdOutputGain,       // @ts-param min=-12.0 max=12.0 default=0.0 unit=dB label="Output Gain"
+  kParamIdBypass,           // @ts-param default=0 label="Bypass" type=bool
   
   kParamIdCount
 };

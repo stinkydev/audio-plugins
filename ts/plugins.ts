@@ -1,37 +1,18 @@
 // Copyright 2025
 // Audio Plugins TypeScript definitions index
 
-export interface IAudioPluginParam {
-  id: string;
-  description: string;
-  label: string;
-  min?: number;
-  max?: number;
-  defaultValue: number;
-  getDisplayValue?: (value: number) => number;
-  getDisplayText?: (value: number) => string;
-  enumValues?: { value: number; label: string }[];
-  type: 'float' | 'bool' | 'enum';
-}
-
-export interface IAudioPlugin {
-  id: string;
-  filename: string;
-  description: string;
-  params: IAudioPluginParam[];
-}
-
 // Re-export individual plugins
-export { CompressorPlugin } from './compressor/compressor-plugin';
-export { EqPlugin, FilterType } from './eq/eq-plugin';
-export { LimiterPlugin } from './limiter/limiter-plugin';
-export { DelayPlugin } from './delay/delay-plugin';
+export { CompressorPlugin } from './compressor-plugin';
+export { EqPlugin } from './eq-plugin';
+export { LimiterPlugin } from './limiter-plugin';
+export { DelayPlugin } from './delay-plugin';
 
 // Export all plugins as an array
-import { CompressorPlugin } from './compressor/compressor-plugin';
-import { EqPlugin } from './eq/eq-plugin';
-import { LimiterPlugin } from './limiter/limiter-plugin';
-import { DelayPlugin } from './delay/delay-plugin';
+import { CompressorPlugin } from './compressor-plugin';
+import { EqPlugin } from './eq-plugin';
+import { LimiterPlugin } from './limiter-plugin';
+import { DelayPlugin } from './delay-plugin';
+import { IAudioPlugin } from './audio-plugin';
 
 export const AllPlugins: IAudioPlugin[] = [
   CompressorPlugin,

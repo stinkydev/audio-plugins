@@ -1,40 +1,15 @@
 // Copyright 2025
 // Auto-generated TypeScript definitions for Limiter plugin
 
-export interface IAudioPluginParam {
-  name: string;
-  id: number;  // Numeric CLAP parameter ID
-  description: string;
-  label: string;
-  min?: number;
-  max?: number;
-  defaultValue: number;
-  getDisplayValue?: (value: number) => number;
-  getDisplayText?: (value: number) => string;
-  enumValues?: { value: number; label: string }[];
-  type: 'float' | 'bool' | 'enum';
-}
-
-export interface IAudioPlugin {
-  id: string;
-  filename: string;
-  description: string;
-  params: IAudioPluginParam[];
-}
-
-// Parameter ranges (actual units)
-const THRESHOLD_MIN = -60.0;
-const THRESHOLD_MAX = 0.0;
-const OUTPUT_LEVEL_MIN = -60.0;
-const OUTPUT_LEVEL_MAX = 0.0;
+import { IAudioPlugin } from "./audio-plugin";
 
 // Conversion functions from normalized [0,1] to actual values
 function normalizedToThreshold(norm: number): number {
-  return THRESHOLD_MIN + norm * (THRESHOLD_MAX - THRESHOLD_MIN);
+  return -60 + norm * (0 - -60);
 }
 
 function normalizedToOutputLevel(norm: number): number {
-  return OUTPUT_LEVEL_MIN + norm * (OUTPUT_LEVEL_MAX - OUTPUT_LEVEL_MIN);
+  return -60 + norm * (0 - -60);
 }
 
 // Display text functions with units
@@ -53,24 +28,24 @@ export const LimiterPlugin: IAudioPlugin = {
   params: [
     {
       name: 'threshold',
-      id: 100,  // kParamIdThreshold
+      id: 100,
       description: 'Threshold',
       label: 'Threshold',
       min: 0.0,
       max: 1.0,
-      defaultValue: ((-0.1 - THRESHOLD_MIN) / (THRESHOLD_MAX - THRESHOLD_MIN)),
+      defaultValue: 0.998333,
       getDisplayValue: normalizedToThreshold,
       getDisplayText: thresholdToText,
       type: 'float'
     },
     {
       name: 'outputLevel',
-      id: 101,  // kParamIdOutputLevel
+      id: 101,
       description: 'Output Level',
       label: 'Output Level',
       min: 0.0,
       max: 1.0,
-      defaultValue: ((-0.1 - OUTPUT_LEVEL_MIN) / (OUTPUT_LEVEL_MAX - OUTPUT_LEVEL_MIN)),
+      defaultValue: 0.998333,
       getDisplayValue: normalizedToOutputLevel,
       getDisplayText: outputLevelToText,
       type: 'float'

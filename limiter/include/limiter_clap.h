@@ -13,10 +13,22 @@
 
 namespace fast_limiter {
 
+// @ts-plugin-meta
+// name: Limiter
+// id: com.stinky.limiter
+// filename: StinkyLimiter.clap
+// description: High-performance peak limiter with lookahead and SIMD optimization
+
+// Parameter ranges
+constexpr double kThresholdMin = -60.0;
+constexpr double kThresholdMax = 0.0;
+constexpr double kOutputLevelMin = -60.0;
+constexpr double kOutputLevelMax = 0.0;
+
 // CLAP parameter IDs
 enum LimiterParamId {
-  kParamIdThreshold = 100,
-  kParamIdOutputLevel,
+  kParamIdThreshold = 100,    // @ts-param min=-60.0 max=0.0 default=-0.1 unit=dB label="Threshold"
+  kParamIdOutputLevel,        // @ts-param min=-60.0 max=0.0 default=-0.1 unit=dB label="Output Level"
   kParamIdCount
 };
 
