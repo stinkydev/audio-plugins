@@ -1,8 +1,9 @@
-// Copyright 2025
+  // Copyright 2025
 // Auto-generated TypeScript definitions for EQ plugin
 
 export interface IAudioPluginParam {
-  id: string;
+  name: string;
+  id: number;  // Numeric CLAP parameter ID
   description: string;
   label: string;
   min?: number;
@@ -57,6 +58,28 @@ function normalizedToOutputGain(norm: number): number {
   return OUTPUT_GAIN_MIN + norm * (OUTPUT_GAIN_MAX - OUTPUT_GAIN_MIN);
 }
 
+// Display text functions with units
+function frequencyToText(norm: number): string {
+  const freq = normalizedToFrequency(norm);
+  if (freq >= 1000.0) {
+    return `${(freq / 1000.0).toFixed(2)} kHz`;
+  } else {
+    return `${freq.toFixed(1)} Hz`;
+  }
+}
+
+function gainToText(norm: number): string {
+  return `${normalizedToGain(norm).toFixed(1)} dB`;
+}
+
+function qToText(norm: number): string {
+  return normalizedToQ(norm).toFixed(2);
+}
+
+function outputGainToText(norm: number): string {
+  return `${normalizedToOutputGain(norm).toFixed(1)} dB`;
+}
+
 function frequencyToNormalized(hz: number): number {
   return Math.log(hz / FREQ_MIN) / Math.log(FREQ_MAX / FREQ_MIN);
 }
@@ -89,11 +112,14 @@ function createBandParams(bandIndex: number): IAudioPluginParam[] {
   const defaultTypes = [FilterType.kLowShelf, FilterType.kBell, FilterType.kBell, FilterType.kHighShelf];
   const defaultQs = [0.707, 1.0, 1.0, 0.707];
   
+  const baseParamId = 100 + (bandIndex * 5);  // Each band has 5 params: Type, Freq, Gain, Q, Enable
+  
   return [
     {
-      id: `band${bandNum}Type`,
+      name: `band${bandNum}Type`,
+      id: baseParamId + 0,  // kParamIdBand{N}Type
       description: `Band ${bandNum} Type`,
-      label: `Band ${bandNum} Type`,
+      label: `B ${bandNum} Type`,
       min: 0,
       max: 4,
       defaultValue: defaultTypes[bandIndex],
@@ -108,37 +134,44 @@ function createBandParams(bandIndex: number): IAudioPluginParam[] {
       type: 'enum'
     },
     {
-      id: `band${bandNum}Freq`,
+      name: `band${bandNum}Freq`,
+      id: baseParamId + 1,  // kParamIdBand{N}Freq
       description: `Band ${bandNum} Frequency`,
-      label: `Band ${bandNum} Frequency`,
+      label: `B ${bandNum} Frequency`,
       min: 0.0,
       max: 1.0,
       defaultValue: frequencyToNormalized(defaultFreqs[bandIndex]),
       getDisplayValue: normalizedToFrequency,
+      getDisplayText: frequencyToText,
       type: 'float'
     },
     {
-      id: `band${bandNum}Gain`,
+      name: `band${bandNum}Gain`,
+      id: baseParamId + 2,  // kParamIdBand{N}Gain
       description: `Band ${bandNum} Gain`,
-      label: `Band ${bandNum} Gain`,
+      label: `B ${bandNum} Gain`,
       min: 0.0,
       max: 1.0,
       defaultValue: gainToNormalized(0.0),
       getDisplayValue: normalizedToGain,
+      getDisplayText: gainToText,
       type: 'float'
     },
     {
-      id: `band${bandNum}Q`,
+      name: `band${bandNum}Q`,
+      id: baseParamId + 3,  // kParamIdBand{N}Q
       description: `Band ${bandNum} Q`,
-      label: `Band ${bandNum} Q`,
+      label: `B ${bandNum} Q`,
       min: 0.0,
       max: 1.0,
       defaultValue: qToNormalized(defaultQs[bandIndex]),
       getDisplayValue: normalizedToQ,
+      getDisplayText: qToText,
       type: 'float'
     },
     {
-      id: `band${bandNum}Enable`,
+      name: `band${bandNum}Enable`,
+      id: baseParamId + 4,  // kParamIdBand{N}Enable
       description: `Band ${bandNum} Enable`,
       label: `Band ${bandNum} Enable`,
       min: 0.0,
@@ -154,22 +187,28 @@ export const EqPlugin: IAudioPlugin = {
   filename: 'StinkyEQ.clap',
   description: 'High-quality 4-band parametric EQ with multiple filter types',
   params: [
+    // Bands 1-4 (params 0-19)
     ...createBandParams(0),
     ...createBandParams(1),
     ...createBandParams(2),
     ...createBandParams(3),
+    // Output Gain (param 120)
     {
-      id: 'outputGain',
+      name: 'outputGain',
+      id: 120,  // kParamIdOutputGain
       description: 'Output Gain',
       label: 'Output Gain',
       min: 0.0,
       max: 1.0,
       defaultValue: outputGainToNormalized(0.0),
       getDisplayValue: normalizedToOutputGain,
+      getDisplayText: outputGainToText,
       type: 'float'
     },
+    // Bypass (param 121)
     {
-      id: 'bypass',
+      name: 'bypass',
+      id: 121,  // kParamIdBypass
       description: 'Bypass',
       label: 'Bypass',
       min: 0.0,

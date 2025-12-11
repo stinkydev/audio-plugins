@@ -2,7 +2,8 @@
 // Auto-generated TypeScript definitions for Delay plugin
 
 export interface IAudioPluginParam {
-  id: string;
+  name: string;
+  id: number;  // Numeric CLAP parameter ID
   description: string;
   label: string;
   min?: number;
@@ -36,29 +37,42 @@ function normalizedToMix(norm: number): number {
   return MIX_MIN + norm * (MIX_MAX - MIX_MIN);
 }
 
+// Display text functions with units
+function delayTimeToText(norm: number): string {
+  return `${normalizedToDelayTime(norm).toFixed(1)} ms`;
+}
+
+function mixToText(norm: number): string {
+  return `${(normalizedToMix(norm) * 100.0).toFixed(1)}%`;
+}
+
 export const DelayPlugin: IAudioPlugin = {
   id: 'com.stinky.delay',
   filename: 'StinkyDelay.clap',
   description: 'Simple stereo delay effect',
   params: [
     {
-      id: 'delayTime',
+      name: 'delayTime',
+      id: 100,  // kParamIdDelayTime
       description: 'Delay Time',
       label: 'Delay Time',
       min: 0.0,
       max: 1.0,
       defaultValue: 0.0,
       getDisplayValue: normalizedToDelayTime,
+      getDisplayText: delayTimeToText,
       type: 'float'
     },
     {
-      id: 'mix',
+      name: 'mix',
+      id: 101,  // kParamIdMix
       description: 'Mix',
       label: 'Mix',
       min: 0.0,
       max: 1.0,
       defaultValue: 1.0,
       getDisplayValue: normalizedToMix,
+      getDisplayText: mixToText,
       type: 'float'
     }
   ]

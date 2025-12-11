@@ -2,7 +2,8 @@
 // Auto-generated TypeScript definitions for Limiter plugin
 
 export interface IAudioPluginParam {
-  id: string;
+  name: string;
+  id: number;  // Numeric CLAP parameter ID
   description: string;
   label: string;
   min?: number;
@@ -36,29 +37,42 @@ function normalizedToOutputLevel(norm: number): number {
   return OUTPUT_LEVEL_MIN + norm * (OUTPUT_LEVEL_MAX - OUTPUT_LEVEL_MIN);
 }
 
+// Display text functions with units
+function thresholdToText(norm: number): string {
+  return `${normalizedToThreshold(norm).toFixed(1)} dB`;
+}
+
+function outputLevelToText(norm: number): string {
+  return `${normalizedToOutputLevel(norm).toFixed(1)} dB`;
+}
+
 export const LimiterPlugin: IAudioPlugin = {
   id: 'com.stinky.limiter',
   filename: 'StinkyLimiter.clap',
   description: 'High-performance peak limiter with lookahead and SIMD optimization',
   params: [
     {
-      id: 'threshold',
+      name: 'threshold',
+      id: 100,  // kParamIdThreshold
       description: 'Threshold',
       label: 'Threshold',
       min: 0.0,
       max: 1.0,
       defaultValue: ((-0.1 - THRESHOLD_MIN) / (THRESHOLD_MAX - THRESHOLD_MIN)),
       getDisplayValue: normalizedToThreshold,
+      getDisplayText: thresholdToText,
       type: 'float'
     },
     {
-      id: 'outputLevel',
+      name: 'outputLevel',
+      id: 101,  // kParamIdOutputLevel
       description: 'Output Level',
       label: 'Output Level',
       min: 0.0,
       max: 1.0,
       defaultValue: ((-0.1 - OUTPUT_LEVEL_MIN) / (OUTPUT_LEVEL_MAX - OUTPUT_LEVEL_MIN)),
       getDisplayValue: normalizedToOutputLevel,
+      getDisplayText: outputLevelToText,
       type: 'float'
     }
   ]

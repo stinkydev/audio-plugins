@@ -14,7 +14,7 @@
 namespace stinky_delay {
 
 enum DelayParamId {
-  kParamIdDelayTime = 0,
+  kParamIdDelayTime = 100,
   kParamIdMix,
   kParamIdCount
 };

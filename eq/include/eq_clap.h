@@ -16,7 +16,7 @@ namespace fast_eq {
 // CLAP parameter IDs
 enum EqParamId {
   // Band 1
-  kParamIdBand1Type = 0,
+  kParamIdBand1Type = 100,
   kParamIdBand1Freq,
   kParamIdBand1Gain,
   kParamIdBand1Q,

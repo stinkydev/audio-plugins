@@ -29,7 +29,7 @@ constexpr const char* kFeatures[] = {
 
 // Parameter ranges (actual units)
 constexpr double kDelayTimeMin = 0.0;
-constexpr double kDelayTimeMax = 2000.0;
+constexpr double kDelayTimeMax = 1000.0;
 constexpr double kMixMin = 0.0;
 constexpr double kMixMax = 1.0;
 

@@ -15,7 +15,7 @@ namespace fast_compressor {
 
 // CLAP parameter IDs
 enum CompressorParamId {
-  kParamIdThreshold = 0,
+  kParamIdThreshold = 100,
   kParamIdRatio,
   kParamIdAttack,
   kParamIdRelease,

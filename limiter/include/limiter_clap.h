@@ -15,7 +15,7 @@ namespace fast_limiter {
 
 // CLAP parameter IDs
 enum LimiterParamId {
-  kParamIdThreshold = 0,
+  kParamIdThreshold = 100,
   kParamIdOutputLevel,
   kParamIdCount
 };
