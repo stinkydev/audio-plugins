@@ -1,6 +1,6 @@
 {
   "name": "audio-plugins",
-  "version": "1.0.0",
+  "version": "0.0.3",
   "description": "High-performance audio plugins with CLAP support",
   "scripts": {
     "generate:ts": "node scripts/generate-from-annotations.js"
