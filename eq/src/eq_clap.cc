@@ -27,16 +27,6 @@ constexpr const char* kFeatures[] = {
     nullptr
 };
 
-// Parameter ranges
-constexpr double kFreqMin = 20.0;
-constexpr double kFreqMax = 20000.0;
-constexpr double kGainMin = -24.0;
-constexpr double kGainMax = 24.0;
-constexpr double kQMin = 0.1;
-constexpr double kQMax = 10.0;
-constexpr double kOutputGainMin = -12.0;
-constexpr double kOutputGainMax = 12.0;
-
 // Conversion helper functions
 inline double NormalizedToFrequency(double norm) {
   // Logarithmic scaling for frequency
