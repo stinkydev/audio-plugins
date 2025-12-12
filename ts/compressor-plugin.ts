@@ -57,6 +57,13 @@ export const CompressorPlugin: IAudioPlugin = {
   id: 'com.stinky.compressor',
   filename: 'StinkyCompressor.clap',
   description: 'High-performance audio compressor with SIMD optimization',
+  inputPorts: [
+    { id: 0, name: 'Audio Input', channels: 2, isMain: true },
+    { id: 1, name: 'Sidechain Input', channels: 2, isMain: false },
+  ],
+  outputPorts: [
+    { id: 0, name: 'Audio Output', channels: 2, isMain: true },
+  ],
   params: [
     {
       name: 'threshold',

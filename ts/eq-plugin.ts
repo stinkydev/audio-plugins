@@ -117,6 +117,12 @@ export const EqPlugin: IAudioPlugin = {
   id: 'com.stinky.eq',
   filename: 'SesameEQ.clap',
   description: 'High-quality 4-band parametric EQ with multiple filter types',
+  inputPorts: [
+    { id: 0, name: 'Audio Input', channels: 2, isMain: true },
+  ],
+  outputPorts: [
+    { id: 0, name: 'Audio Output', channels: 2, isMain: true },
+  ],
   params: [
     {
       name: 'band1Type',

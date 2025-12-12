@@ -172,34 +172,6 @@ TEST_F(CompressorProcessorTest, ResetClearsState) {
   SUCCEED();  // If no crash, reset worked
 }
 
-TEST_F(CompressorProcessorTest, InterleavedProcessingWorks) {
-  CompressorParams params;
-  params.threshold_db = -20.0f;
-  params.ratio = 4.0f;
-  params.attack_ms = 5.0f;
-  params.release_ms = 50.0f;
-  processor_.SetParams(params);
-
-  // Interleaved stereo buffer
-  std::vector<float> interleaved(1024);  // 512 frames * 2 channels
-  for (size_t i = 0; i < 512; ++i) {
-    interleaved[i * 2] = 0.316f;      // Left
-    interleaved[i * 2 + 1] = 0.316f;  // Right
-  }
-
-  processor_.Process(interleaved.data(), 512);
-
-  // Check compression occurred
-  bool compressed = false;
-  for (size_t i = 200; i < 512; ++i) {
-    if (std::abs(interleaved[i * 2]) < 0.31f) {
-      compressed = true;
-      break;
-    }
-  }
-  EXPECT_TRUE(compressed);
-}
-
 TEST_F(CompressorProcessorTest, StereoLinkingWorks) {
   CompressorParams params;
   params.threshold_db = -20.0f;

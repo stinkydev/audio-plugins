@@ -291,6 +291,15 @@ clap_process_status CompressorClap::Process(
   float* out_left = process->audio_outputs[0].data32[0];
   float* out_right = (out_channels > 1) ? process->audio_outputs[0].data32[1] : nullptr;
 
+  // Check for sidechain input (second input port)
+  const float* sc_left = nullptr;
+  const float* sc_right = nullptr;
+  if (input_count >= 2) {
+    const uint32_t sc_channels = process->audio_inputs[1].channel_count;
+    sc_left = process->audio_inputs[1].data32[0];
+    sc_right = (sc_channels > 1) ? process->audio_inputs[1].data32[1] : sc_left;
+  }
+
   // Copy input to output
   std::memcpy(out_left, in_left, frame_count * sizeof(float));
   if (in_right && out_right) {
@@ -299,9 +308,19 @@ clap_process_status CompressorClap::Process(
 
   // Process compression
   if (out_right) {
-    processor_.ProcessStereo(out_left, out_right, frame_count);
+    if (sc_left) {
+      // Use sidechain for detection
+      processor_.ProcessStereoWithSidechain(out_left, out_right, sc_left, sc_right, frame_count);
+    } else {
+      // Use main input for detection
+      processor_.ProcessStereo(out_left, out_right, frame_count);
+    }
   } else {
-    processor_.ProcessStereo(out_left, out_left, frame_count);
+    if (sc_left) {
+      processor_.ProcessStereoWithSidechain(out_left, out_left, sc_left, sc_right, frame_count);
+    } else {
+      processor_.ProcessStereo(out_left, out_left, frame_count);
+    }
   }
 
   return CLAP_PROCESS_CONTINUE;
@@ -545,20 +564,37 @@ void CompressorClap::SetParamValue(clap_id param_id, double value) noexcept {
   }
 }
 
-uint32_t CompressorClap::AudioPortsCount(bool /*is_input*/) const noexcept {
-  return 1;  // One stereo port for input and one for output
+uint32_t CompressorClap::AudioPortsCount(bool is_input) const noexcept {
+  return is_input ? 2 : 1;  // Two stereo inputs (main + sidechain), one output
 }
 
 bool CompressorClap::AudioPortsGet(uint32_t index, bool is_input,
                                    clap_audio_port_info_t* info) const noexcept {
-  if (index > 0) return false;
-
-  info->id = 0;
-  std::snprintf(info->name, sizeof(info->name), is_input ? "Audio Input" : "Audio Output");
-  info->channel_count = 2;
-  info->flags = CLAP_AUDIO_PORT_IS_MAIN;
-  info->port_type = CLAP_PORT_STEREO;
-  info->in_place_pair = is_input ? 0 : 0;
+  if (is_input) {
+    if (index > 1) return false;
+    
+    info->id = index;
+    if (index == 0) {
+      std::snprintf(info->name, sizeof(info->name), "Audio Input");
+      info->flags = CLAP_AUDIO_PORT_IS_MAIN;
+      info->in_place_pair = 0;
+    } else {
+      std::snprintf(info->name, sizeof(info->name), "Sidechain Input");
+      info->flags = 0;  // Not main, not required
+      info->in_place_pair = CLAP_INVALID_ID;
+    }
+    info->channel_count = 2;
+    info->port_type = CLAP_PORT_STEREO;
+  } else {
+    if (index > 0) return false;
+    
+    info->id = 0;
+    std::snprintf(info->name, sizeof(info->name), "Audio Output");
+    info->channel_count = 2;
+    info->flags = CLAP_AUDIO_PORT_IS_MAIN;
+    info->port_type = CLAP_PORT_STEREO;
+    info->in_place_pair = 0;
+  }
 
   return true;
 }

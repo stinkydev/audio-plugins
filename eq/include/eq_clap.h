@@ -19,6 +19,9 @@ namespace fast_eq {
 // filename: SesameEQ.clap
 // description: High-quality 4-band parametric EQ with multiple filter types
 
+// @ts-port type=input id=0 name="Audio Input" channels=2 main=true
+// @ts-port type=output id=0 name="Audio Output" channels=2 main=true
+
 // Parameter ranges
 constexpr double kFreqMin = 20.0;
 constexpr double kFreqMax = 20000.0;
@@ -32,7 +35,7 @@ constexpr double kOutputGainMax = 12.0;
 // CLAP parameter IDs
 enum EqParamId {
   // Band 1
-  kParamIdBand1Type = 100,  // @ts-param default=1 label="Band 1 Type" type=enum values="Low Cut,Bell,Low Shelf,High Shelf,High Cut"
+  kParamIdBand1Type = 0,  // @ts-param default=1 label="Band 1 Type" type=enum values="Low Cut,Bell,Low Shelf,High Shelf,High Cut"
   kParamIdBand1Freq,        // @ts-param min=20.0 max=20000.0 default=100.0 unit=Hz label="Band 1 Frequency" scale=log
   kParamIdBand1Gain,        // @ts-param min=-24.0 max=24.0 default=0.0 unit=dB label="Band 1 Gain"
   kParamIdBand1Q,           // @ts-param min=0.1 max=10.0 default=0.707 label="Band 1 Q"

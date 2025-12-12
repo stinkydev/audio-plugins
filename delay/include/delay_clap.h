@@ -19,6 +19,9 @@ namespace stinky_delay {
 // filename: StinkyDelay.clap
 // description: Simple stereo delay effect
 
+// @ts-port type=input id=0 name="Audio Input" channels=2 main=true
+// @ts-port type=output id=0 name="Audio Output" channels=2 main=true
+
 // Parameter ranges (actual units)
 constexpr double kDelayTimeMin = 0.0;
 constexpr double kDelayTimeMax = 1000.0;
@@ -26,7 +29,7 @@ constexpr double kMixMin = 0.0;
 constexpr double kMixMax = 1.0;
 
 enum DelayParamId {
-  kParamIdDelayTime = 100,  // @ts-param min=0.0 max=1000.0 default=0.0 unit=ms label="Delay Time"
+  kParamIdDelayTime = 0,  // @ts-param min=0.0 max=1000.0 default=0.0 unit=ms label="Delay Time"
   kParamIdMix,              // @ts-param min=0.0 max=1.0 default=1.0 unit=% label="Mix"
   kParamIdCount
 };

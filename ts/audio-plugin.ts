@@ -13,9 +13,18 @@ export interface IAudioPluginParam {
   type: 'float' | 'bool' | 'enum';
 }
 
+export interface IAudioPort {
+  id: number;
+  name: string;
+  channels: number;
+  isMain: boolean;
+}
+
 export interface IAudioPlugin {
   id: string;
   filename: string;
   description: string;
+  inputPorts?: IAudioPort[];
+  outputPorts?: IAudioPort[];
   params: IAudioPluginParam[];
 }

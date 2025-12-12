@@ -25,6 +25,12 @@ export const DelayPlugin: IAudioPlugin = {
   id: 'com.stinky.delay',
   filename: 'StinkyDelay.clap',
   description: 'Simple stereo delay effect',
+  inputPorts: [
+    { id: 0, name: 'Audio Input', channels: 2, isMain: true },
+  ],
+  outputPorts: [
+    { id: 0, name: 'Audio Output', channels: 2, isMain: true },
+  ],
   params: [
     {
       name: 'delayTime',

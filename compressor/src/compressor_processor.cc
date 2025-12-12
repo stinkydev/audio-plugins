@@ -6,13 +6,10 @@
 #include <algorithm>
 #include <cmath>
 
-#include "simd_utils.h"
-
 namespace fast_compressor {
 
 namespace {
 
-constexpr float kMinDb = -96.0f;
 constexpr float kEpsilon = 1e-8f;
 
 inline float DbToLinear(float db) {
@@ -88,46 +85,25 @@ float CompressorProcessor::ApplyEnvelope(float target_gain,
   return coeff * current_gain + (1.0f - coeff) * target_gain;
 }
 
-void CompressorProcessor::Process(float* buffer, size_t num_frames) {
-  const float makeup_gain = DbToLinear(params_.makeup_gain_db);
-  
-  for (size_t i = 0; i < num_frames * 2; i += 2) {
-    // Get peak level from stereo pair
-    const float left = std::abs(buffer[i]);
-    const float right = std::abs(buffer[i + 1]);
-    const float peak = std::max(left, right);
-    
-    // Convert to dB
-    const float peak_db = LinearToDb(peak);
-    
-    // Calculate target gain reduction
-    const float gain_reduction = CalculateGainReduction(peak_db);
-    const float target_gain = DbToLinear(gain_reduction);
-    
-    // Apply envelope
-    envelope_gain_ = ApplyEnvelope(target_gain, envelope_gain_);
-    
-    // Store gain reduction for metering
-    gain_reduction_db_ = LinearToDb(envelope_gain_);
-    
-    // Apply gain and makeup
-    const float final_gain = envelope_gain_ * makeup_gain;
-    buffer[i] *= final_gain;
-    buffer[i + 1] *= final_gain;
-  }
-}
-
 void CompressorProcessor::ProcessStereo(float* left, float* right, 
                                         size_t num_frames) {
+  // Use main input for sidechain detection
+  ProcessStereoWithSidechain(left, right, left, right, num_frames);
+}
+
+void CompressorProcessor::ProcessStereoWithSidechain(float* left, float* right,
+                                                     const float* sc_left, 
+                                                     const float* sc_right,
+                                                     size_t num_frames) {
   // Calculate c_est (estimated average gain reduction in dB)
   // This is half the maximum gain reduction at threshold
   const float c_est = params_.threshold_db * (1.0f - 1.0f / params_.ratio) / 2.0f;
   
   for (size_t i = 0; i < num_frames; ++i) {
-    // Get peak level from stereo pair
-    const float left_abs = std::abs(left[i]);
-    const float right_abs = std::abs(right[i]);
-    const float peak = std::max(left_abs, right_abs);
+    // Get peak level from sidechain (or main input if no sidechain)
+    const float sc_left_abs = std::abs(sc_left[i]);
+    const float sc_right_abs = std::abs(sc_right[i]);
+    const float peak = std::max(sc_left_abs, sc_right_abs);
     
     // Convert to dB
     const float peak_db = LinearToDb(peak);
@@ -158,7 +134,7 @@ void CompressorProcessor::ProcessStereo(float* left, float* right,
     
     const float makeup_gain = DbToLinear(makeup_gain_db);
     
-    // Apply compression gain and makeup
+    // Apply compression gain and makeup to main signal
     const float final_gain = envelope_gain_ * makeup_gain;
     left[i] *= final_gain;
     right[i] *= final_gain;

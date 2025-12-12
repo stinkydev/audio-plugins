@@ -35,6 +35,54 @@ function parsePluginMeta(content) {
 }
 
 /**
+ * Parse port annotations from @ts-port comments
+ */
+function parsePorts(content) {
+  const ports = { inputs: [], outputs: [] };
+  
+  // Find all port annotations
+  const portRegex = /\/\/\s*@ts-port\s+(.+)/g;
+  let match;
+  
+  while ((match = portRegex.exec(content)) !== null) {
+    const annotation = match[1];
+    
+    // Parse port attributes
+    const attrs = {};
+    const attrRegex = /(\w+)=("(?:[^"\\]|\\.)*"|[^\s]+)/g;
+    let attrMatch;
+    while ((attrMatch = attrRegex.exec(annotation)) !== null) {
+      let value = attrMatch[2];
+      // Remove quotes if present
+      if (value.startsWith('"') && value.endsWith('"')) {
+        value = value.slice(1, -1);
+      }
+      attrs[attrMatch[1]] = value;
+    }
+    
+    // Add to appropriate port list
+    const port = {
+      id: parseInt(attrs.id || '0'),
+      name: attrs.name || 'Port',
+      channels: parseInt(attrs.channels || '2'),
+      isMain: attrs.main === 'true'
+    };
+    
+    if (attrs.type === 'input') {
+      ports.inputs.push(port);
+    } else if (attrs.type === 'output') {
+      ports.outputs.push(port);
+    }
+  }
+  
+  // Sort ports by id
+  ports.inputs.sort((a, b) => a.id - b.id);
+  ports.outputs.sort((a, b) => a.id - b.id);
+  
+  return ports;
+}
+
+/**
  * Parse parameter annotations from enum
  */
 function parseParameters(content) {
@@ -84,7 +132,7 @@ function parseParameters(content) {
 /**
  * Generate TypeScript code from parsed data
  */
-function generateTypeScript(pluginMeta, params) {
+function generateTypeScript(pluginMeta, params, ports) {
   const className = pluginMeta.name;
   
   let code = `// Copyright 2025\n`;
@@ -142,6 +190,25 @@ function generateTypeScript(pluginMeta, params) {
   code += `  id: '${pluginMeta.id}',\n`;
   code += `  filename: '${pluginMeta.filename}',\n`;
   code += `  description: '${pluginMeta.description}',\n`;
+  
+  // Add ports if present
+  if (ports && (ports.inputs.length > 0 || ports.outputs.length > 0)) {
+    if (ports.inputs.length > 0) {
+      code += `  inputPorts: [\n`;
+      for (const port of ports.inputs) {
+        code += `    { id: ${port.id}, name: '${port.name}', channels: ${port.channels}, isMain: ${port.isMain} },\n`;
+      }
+      code += `  ],\n`;
+    }
+    if (ports.outputs.length > 0) {
+      code += `  outputPorts: [\n`;
+      for (const port of ports.outputs) {
+        code += `    { id: ${port.id}, name: '${port.name}', channels: ${port.channels}, isMain: ${port.isMain} },\n`;
+      }
+      code += `  ],\n`;
+    }
+  }
+  
   code += `  params: [\n`;
   
   for (let i = 0; i < params.length; i++) {
@@ -218,8 +285,9 @@ function processPlugin(plugin, rootDir) {
   try {
     const meta = parsePluginMeta(content);
     const params = parseParameters(content);
+    const ports = parsePorts(content);
     
-    const tsCode = generateTypeScript(meta, params);
+    const tsCode = generateTypeScript(meta, params, ports);
     
     const outputPath = path.join(rootDir, 'ts', `${plugin.name}-plugin.ts`);
     fs.writeFileSync(outputPath, tsCode, 'utf8');
@@ -249,4 +317,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { parsePluginMeta, parseParameters, generateTypeScript };
+module.exports = { parsePluginMeta, parseParameters, parsePorts, generateTypeScript };

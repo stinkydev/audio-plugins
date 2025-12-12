@@ -35,11 +35,14 @@ class CompressorProcessor {
   // Get current parameters
   const CompressorParams& GetParams() const { return params_; }
 
-  // Process audio buffer (stereo interleaved)
-  void Process(float* buffer, size_t num_frames);
-
   // Process audio buffer (stereo separate channels)
   void ProcessStereo(float* left, float* right, size_t num_frames);
+
+  // Process audio buffer (stereo separate channels) with sidechain input
+  // If sidechain pointers are null, uses main input for detection
+  void ProcessStereoWithSidechain(float* left, float* right, 
+                                  const float* sc_left, const float* sc_right,
+                                  size_t num_frames);
 
   // Get current gain reduction in dB
   float GetGainReduction() const { return gain_reduction_db_; }

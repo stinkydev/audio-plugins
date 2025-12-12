@@ -19,6 +19,9 @@ namespace fast_limiter {
 // filename: StinkyLimiter.clap
 // description: High-performance peak limiter with lookahead and SIMD optimization
 
+// @ts-port type=input id=0 name="Audio Input" channels=2 main=true
+// @ts-port type=output id=0 name="Audio Output" channels=2 main=true
+
 // Parameter ranges
 constexpr double kThresholdMin = -60.0;
 constexpr double kThresholdMax = 0.0;
@@ -27,7 +30,7 @@ constexpr double kOutputLevelMax = 0.0;
 
 // CLAP parameter IDs
 enum LimiterParamId {
-  kParamIdThreshold = 100,    // @ts-param min=-60.0 max=0.0 default=-0.1 unit=dB label="Threshold"
+  kParamIdThreshold = 0,    // @ts-param min=-60.0 max=0.0 default=-0.1 unit=dB label="Threshold"
   kParamIdOutputLevel,        // @ts-param min=-60.0 max=0.0 default=-0.1 unit=dB label="Output Level"
   kParamIdCount
 };

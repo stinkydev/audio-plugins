@@ -25,6 +25,12 @@ export const LimiterPlugin: IAudioPlugin = {
   id: 'com.stinky.limiter',
   filename: 'StinkyLimiter.clap',
   description: 'High-performance peak limiter with lookahead and SIMD optimization',
+  inputPorts: [
+    { id: 0, name: 'Audio Input', channels: 2, isMain: true },
+  ],
+  outputPorts: [
+    { id: 0, name: 'Audio Output', channels: 2, isMain: true },
+  ],
   params: [
     {
       name: 'threshold',
