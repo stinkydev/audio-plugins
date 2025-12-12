@@ -126,7 +126,7 @@ export const EqPlugin: IAudioPlugin = {
   params: [
     {
       name: 'band1Type',
-      id: 100,
+      id: 0,
       description: 'Band 1 Type',
       label: 'Band 1 Type',
       min: 0.0,
@@ -143,7 +143,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band1Freq',
-      id: 101,
+      id: 1,
       description: 'Band 1 Frequency',
       label: 'Band 1 Frequency',
       min: 0.0,
@@ -155,7 +155,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band1Gain',
-      id: 102,
+      id: 2,
       description: 'Band 1 Gain',
       label: 'Band 1 Gain',
       min: 0.0,
@@ -167,7 +167,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band1Q',
-      id: 103,
+      id: 3,
       description: 'Band 1 Q',
       label: 'Band 1 Q',
       min: 0.0,
@@ -179,7 +179,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band1Enable',
-      id: 104,
+      id: 4,
       description: 'Band 1 Enable',
       label: 'Band 1 Enable',
       min: 0.0,
@@ -189,7 +189,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band2Type',
-      id: 105,
+      id: 5,
       description: 'Band 2 Type',
       label: 'Band 2 Type',
       min: 0.0,
@@ -206,7 +206,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band2Freq',
-      id: 106,
+      id: 6,
       description: 'Band 2 Frequency',
       label: 'Band 2 Frequency',
       min: 0.0,
@@ -218,7 +218,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band2Gain',
-      id: 107,
+      id: 7,
       description: 'Band 2 Gain',
       label: 'Band 2 Gain',
       min: 0.0,
@@ -230,7 +230,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band2Q',
-      id: 108,
+      id: 8,
       description: 'Band 2 Q',
       label: 'Band 2 Q',
       min: 0.0,
@@ -242,7 +242,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band2Enable',
-      id: 109,
+      id: 9,
       description: 'Band 2 Enable',
       label: 'Band 2 Enable',
       min: 0.0,
@@ -252,7 +252,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band3Type',
-      id: 110,
+      id: 10,
       description: 'Band 3 Type',
       label: 'Band 3 Type',
       min: 0.0,
@@ -269,7 +269,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band3Freq',
-      id: 111,
+      id: 11,
       description: 'Band 3 Frequency',
       label: 'Band 3 Frequency',
       min: 0.0,
@@ -281,7 +281,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band3Gain',
-      id: 112,
+      id: 12,
       description: 'Band 3 Gain',
       label: 'Band 3 Gain',
       min: 0.0,
@@ -293,7 +293,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band3Q',
-      id: 113,
+      id: 13,
       description: 'Band 3 Q',
       label: 'Band 3 Q',
       min: 0.0,
@@ -305,7 +305,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band3Enable',
-      id: 114,
+      id: 14,
       description: 'Band 3 Enable',
       label: 'Band 3 Enable',
       min: 0.0,
@@ -315,7 +315,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band4Type',
-      id: 115,
+      id: 15,
       description: 'Band 4 Type',
       label: 'Band 4 Type',
       min: 0.0,
@@ -332,7 +332,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band4Freq',
-      id: 116,
+      id: 16,
       description: 'Band 4 Frequency',
       label: 'Band 4 Frequency',
       min: 0.0,
@@ -344,7 +344,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band4Gain',
-      id: 117,
+      id: 17,
       description: 'Band 4 Gain',
       label: 'Band 4 Gain',
       min: 0.0,
@@ -356,7 +356,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band4Q',
-      id: 118,
+      id: 18,
       description: 'Band 4 Q',
       label: 'Band 4 Q',
       min: 0.0,
@@ -368,7 +368,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'band4Enable',
-      id: 119,
+      id: 19,
       description: 'Band 4 Enable',
       label: 'Band 4 Enable',
       min: 0.0,
@@ -378,7 +378,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'outputGain',
-      id: 120,
+      id: 20,
       description: 'Output Gain',
       label: 'Output Gain',
       min: 0.0,
@@ -390,7 +390,7 @@ export const EqPlugin: IAudioPlugin = {
     },
     {
       name: 'bypass',
-      id: 121,
+      id: 21,
       description: 'Bypass',
       label: 'Bypass',
       min: 0.0,

@@ -34,7 +34,7 @@ export const LimiterPlugin: IAudioPlugin = {
   params: [
     {
       name: 'threshold',
-      id: 100,
+      id: 0,
       description: 'Threshold',
       label: 'Threshold',
       min: 0.0,
@@ -46,7 +46,7 @@ export const LimiterPlugin: IAudioPlugin = {
     },
     {
       name: 'outputLevel',
-      id: 101,
+      id: 1,
       description: 'Output Level',
       label: 'Output Level',
       min: 0.0,

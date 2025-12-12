@@ -67,7 +67,7 @@ export const CompressorPlugin: IAudioPlugin = {
   params: [
     {
       name: 'threshold',
-      id: 100,
+      id: 0,
       description: 'Threshold',
       label: 'Threshold',
       min: 0.0,
@@ -79,7 +79,7 @@ export const CompressorPlugin: IAudioPlugin = {
     },
     {
       name: 'ratio',
-      id: 101,
+      id: 1,
       description: 'Ratio',
       label: 'Ratio',
       min: 0.0,
@@ -91,7 +91,7 @@ export const CompressorPlugin: IAudioPlugin = {
     },
     {
       name: 'attack',
-      id: 102,
+      id: 2,
       description: 'Attack',
       label: 'Attack',
       min: 0.0,
@@ -103,7 +103,7 @@ export const CompressorPlugin: IAudioPlugin = {
     },
     {
       name: 'release',
-      id: 103,
+      id: 3,
       description: 'Release',
       label: 'Release',
       min: 0.0,
@@ -115,7 +115,7 @@ export const CompressorPlugin: IAudioPlugin = {
     },
     {
       name: 'knee',
-      id: 104,
+      id: 4,
       description: 'Knee',
       label: 'Knee',
       min: 0.0,
@@ -127,7 +127,7 @@ export const CompressorPlugin: IAudioPlugin = {
     },
     {
       name: 'makeupGain',
-      id: 105,
+      id: 5,
       description: 'Makeup Gain',
       label: 'Makeup Gain',
       min: 0.0,
@@ -139,7 +139,7 @@ export const CompressorPlugin: IAudioPlugin = {
     },
     {
       name: 'autoMakeup',
-      id: 106,
+      id: 6,
       description: 'Auto Makeup',
       label: 'Auto Makeup',
       min: 0.0,

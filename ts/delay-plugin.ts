@@ -34,7 +34,7 @@ export const DelayPlugin: IAudioPlugin = {
   params: [
     {
       name: 'delayTime',
-      id: 100,
+      id: 0,
       description: 'Delay Time',
       label: 'Delay Time',
       min: 0.0,
@@ -46,7 +46,7 @@ export const DelayPlugin: IAudioPlugin = {
     },
     {
       name: 'mix',
-      id: 101,
+      id: 1,
       description: 'Mix',
       label: 'Mix',
       min: 0.0,
