@@ -122,10 +122,10 @@ TEST_F(SimdUtilsTest, ConvertToDbCorrectResults) {
   ConvertToDb(result.data(), signal.data(), signal.size());
 
   // Verify dB conversion: 20 * log10(abs(x))
-  EXPECT_NEAR(result[0], 20.0f * std::log10f(0.5f), 0.1f);
-  EXPECT_NEAR(result[1], 20.0f * std::log10f(1.0f), 0.1f);
-  EXPECT_NEAR(result[2], 20.0f * std::log10f(0.1f), 0.1f);
-  EXPECT_NEAR(result[3], 20.0f * std::log10f(0.01f), 0.1f);
+  EXPECT_NEAR(result[0], 20.0f * ::log10f(0.5f), 0.1f);
+  EXPECT_NEAR(result[1], 20.0f * ::log10f(1.0f), 0.1f);
+  EXPECT_NEAR(result[2], 20.0f * ::log10f(0.1f), 0.1f);
+  EXPECT_NEAR(result[3], 20.0f * ::log10f(0.01f), 0.1f);
 }
 
 TEST_F(SimdUtilsTest, OperationsHandleNonMultipleOf8) {

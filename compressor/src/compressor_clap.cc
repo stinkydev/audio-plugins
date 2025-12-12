@@ -354,49 +354,49 @@ bool CompressorClap::ParamsInfo(uint32_t param_index,
   switch (param_index) {
     case kParamIdThreshold:
       std::snprintf(info->name, sizeof(info->name), "Threshold");
-      std::snprintf(info->module, sizeof(info->module), "");
+      info->module[0] = '\0';
       info->min_value = 0.0;
       info->max_value = 1.0;
       info->default_value = ThresholdToNormalized(-20.0);
       break;
     case kParamIdRatio:
       std::snprintf(info->name, sizeof(info->name), "Ratio");
-      std::snprintf(info->module, sizeof(info->module), "");
+      info->module[0] = '\0';
       info->min_value = 0.0;
       info->max_value = 1.0;
       info->default_value = RatioToNormalized(4.0);
       break;
     case kParamIdAttack:
       std::snprintf(info->name, sizeof(info->name), "Attack");
-      std::snprintf(info->module, sizeof(info->module), "");
+      info->module[0] = '\0';
       info->min_value = 0.0;
       info->max_value = 1.0;
       info->default_value = AttackToNormalized(5.0);
       break;
     case kParamIdRelease:
       std::snprintf(info->name, sizeof(info->name), "Release");
-      std::snprintf(info->module, sizeof(info->module), "");
+      info->module[0] = '\0';
       info->min_value = 0.0;
       info->max_value = 1.0;
       info->default_value = ReleaseToNormalized(50.0);
       break;
     case kParamIdKnee:
       std::snprintf(info->name, sizeof(info->name), "Knee");
-      std::snprintf(info->module, sizeof(info->module), "");
+      info->module[0] = '\0';
       info->min_value = 0.0;
       info->max_value = 1.0;
       info->default_value = KneeToNormalized(0.0);
       break;
     case kParamIdMakeupGain:
       std::snprintf(info->name, sizeof(info->name), "Makeup Gain");
-      std::snprintf(info->module, sizeof(info->module), "");
+      info->module[0] = '\0';
       info->min_value = 0.0;
       info->max_value = 1.0;
       info->default_value = MakeupToNormalized(0.0);
       break;
     case kParamIdAutoMakeup:
       std::snprintf(info->name, sizeof(info->name), "Auto Makeup");
-      std::snprintf(info->module, sizeof(info->module), "");
+      info->module[0] = '\0';
       info->min_value = 0.0;
       info->max_value = 1.0;
       info->default_value = 0.0;
@@ -650,11 +650,20 @@ static const void* ClapGetFactory(const char* factory_id) {
       ? &kFactory : nullptr;
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
+
 CLAP_EXPORT const clap_plugin_entry_t clap_entry = {
     CLAP_VERSION,
     [](const char* /*plugin_path*/) { return true; },
     []() {},
     ClapGetFactory,
 };
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 }  // extern "C"

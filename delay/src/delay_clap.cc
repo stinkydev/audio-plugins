@@ -290,14 +290,14 @@ bool DelayClap::ParamsInfo(uint32_t param_index,
   switch (param_index) {
     case kParamIdDelayTime:
       std::snprintf(info->name, sizeof(info->name), "Delay Time");
-      std::snprintf(info->module, sizeof(info->module), "");
+      info->module[0] = '\0';
       info->min_value = 0.0;
       info->max_value = 1.0;
       info->default_value = DelayTimeToNormalized(0.0);
       break;
     case kParamIdMix:
       std::snprintf(info->name, sizeof(info->name), "Mix");
-      std::snprintf(info->module, sizeof(info->module), "");
+      info->module[0] = '\0';
       info->min_value = 0.0;
       info->max_value = 1.0;
       info->default_value = MixToNormalized(1.0);
@@ -489,11 +489,20 @@ static const void* ClapGetFactory(const char* factory_id) {
       ? &kFactory : nullptr;
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
+
 CLAP_EXPORT const clap_plugin_entry_t clap_entry = {
     CLAP_VERSION,
     [](const char* /*plugin_path*/) { return true; },
     []() {},
     ClapGetFactory,
 };
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 }  // extern "C"

@@ -389,13 +389,13 @@ bool EqClap::ParamsInfo(uint32_t param_index,
     }
   } else if (param_index == kParamIdOutputGain) {
     std::snprintf(info->name, sizeof(info->name), "Output Gain");
-    std::snprintf(info->module, sizeof(info->module), "");
+    info->module[0] = '\0';
     info->min_value = 0.0;
     info->max_value = 1.0;
     info->default_value = OutputGainToNormalized(0.0);
   } else if (param_index == kParamIdBypass) {
     std::snprintf(info->name, sizeof(info->name), "Bypass");
-    std::snprintf(info->module, sizeof(info->module), "");
+    info->module[0] = '\0';
     info->min_value = 0.0;
     info->max_value = 1.0;
     info->default_value = 0.0;
@@ -654,11 +654,20 @@ static const void* ClapGetFactory(const char* factory_id) {
       ? &kFactory : nullptr;
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
+
 CLAP_EXPORT const clap_plugin_entry_t clap_entry = {
     CLAP_VERSION,
     [](const char* /*plugin_path*/) { return true; },
     []() {},
     ClapGetFactory,
 };
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 }  // extern "C"

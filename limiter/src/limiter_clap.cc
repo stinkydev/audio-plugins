@@ -295,14 +295,14 @@ bool LimiterClap::ParamsInfo(uint32_t param_index,
   switch (param_index) {
     case kParamIdThreshold:
       std::snprintf(info->name, sizeof(info->name), "Threshold");
-      std::snprintf(info->module, sizeof(info->module), "");
+      info->module[0] = '\0';
       info->min_value = 0.0;
       info->max_value = 1.0;
       info->default_value = ThresholdToNormalized(-0.1);
       break;
     case kParamIdOutputLevel:
       std::snprintf(info->name, sizeof(info->name), "Output Level");
-      std::snprintf(info->module, sizeof(info->module), "");
+      info->module[0] = '\0';
       info->min_value = 0.0;
       info->max_value = 1.0;
       info->default_value = OutputLevelToNormalized(-0.1);
@@ -496,11 +496,20 @@ static const void* ClapGetFactory(const char* factory_id) {
       ? &kFactory : nullptr;
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
+
 CLAP_EXPORT const clap_plugin_entry_t clap_entry = {
     CLAP_VERSION,
     [](const char* /*plugin_path*/) { return true; },
     []() {},
     ClapGetFactory,
 };
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 }  // extern "C"

@@ -6,6 +6,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <cstring>
 #include <memory>
 #include <vector>
@@ -105,46 +106,58 @@ TEST_F(ClapEqPluginTest, ParamsInfoOutOfBoundsReturnsFalse) {
 
 TEST_F(ClapEqPluginTest, ParamsGetValueReturnsDefault) {
   double value;
+  clap_param_info_t info;
   
+  // Values are normalized (0-1), so we check against the default_value from ParamsInfo
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdBand1Freq, &info));
   EXPECT_TRUE(plugin_->ParamsValue(kParamIdBand1Freq, &value));
-  EXPECT_DOUBLE_EQ(value, 100.0);
+  EXPECT_NEAR(value, info.default_value, 0.0001);
   
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdBand2Freq, &info));
   EXPECT_TRUE(plugin_->ParamsValue(kParamIdBand2Freq, &value));
-  EXPECT_DOUBLE_EQ(value, 500.0);
+  EXPECT_NEAR(value, info.default_value, 0.0001);
   
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdBand3Freq, &info));
   EXPECT_TRUE(plugin_->ParamsValue(kParamIdBand3Freq, &value));
-  EXPECT_DOUBLE_EQ(value, 2000.0);
+  EXPECT_NEAR(value, info.default_value, 0.0001);
   
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdBand4Freq, &info));
   EXPECT_TRUE(plugin_->ParamsValue(kParamIdBand4Freq, &value));
-  EXPECT_DOUBLE_EQ(value, 8000.0);
+  EXPECT_NEAR(value, info.default_value, 0.0001);
 }
 
 TEST_F(ClapEqPluginTest, ParamsValueToTextFormatsCorrectly) {
   char display[256];
+  clap_param_info_t info;
   
-  // Test frequency formatting (Hz)
-  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Freq, 100.0, display, sizeof(display)));
+  // ParamsValueToText takes normalized values (0-1) and converts them to text
+  // Test frequency formatting (Hz) - need to use normalized value
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdBand1Freq, &info));
+  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Freq, info.default_value, display, sizeof(display)));
   EXPECT_STREQ(display, "100.0 Hz");
   
-  // Test frequency formatting (kHz)
-  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Freq, 1000.0, display, sizeof(display)));
+  // Test frequency formatting (kHz) - use 1001 Hz to ensure it crosses the kHz threshold
+  // Frequency range is 20-20000 Hz (log scale)
+  double norm_1001 = std::log(1001.0 / 20.0) / std::log(20000.0 / 20.0);
+  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Freq, norm_1001, display, sizeof(display)));
   EXPECT_STREQ(display, "1.00 kHz");
   
-  // Test gain formatting
-  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Gain, 6.0, display, sizeof(display)));
+  // Test gain formatting - gain range is -24 to +24, so 6.0 dB = (6.0 - (-24.0)) / 48.0 = 30/48 = 0.625
+  double norm_gain_6 = (6.0 - (-24.0)) / (24.0 - (-24.0));
+  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Gain, norm_gain_6, display, sizeof(display)));
   EXPECT_STREQ(display, "6.0 dB");
   
-  // Test Q formatting
-  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Q, 1.5, display, sizeof(display)));
+  // Test Q formatting - Q range is 0.1 to 10.0 (LINEAR), 1.5 normalized = (1.5 - 0.1) / (10.0 - 0.1) = 1.4/9.9
+  double norm_q_1_5 = (1.5 - 0.1) / (10.0 - 0.1);
+  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Q, norm_q_1_5, display, sizeof(display)));
   EXPECT_STREQ(display, "1.50");
   
-  // Test filter type formatting
-  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Type, 
-              static_cast<double>(FilterType::kHighCut), display, sizeof(display)));
+  // Test filter type formatting - type is stored as integer 0-4 directly
+  // kHighCut = 4, kLowCut = 0 (as per FilterType enum)
+  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Type, 4.0, display, sizeof(display)));
   EXPECT_STREQ(display, "High Cut");
   
-  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Type,
-              static_cast<double>(FilterType::kLowCut), display, sizeof(display)));
+  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdBand1Type, 0.0, display, sizeof(display)));
   EXPECT_STREQ(display, "Low Cut");
 }
 

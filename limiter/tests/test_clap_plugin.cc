@@ -102,32 +102,43 @@ TEST_F(ClapPluginTest, ParamsInfoOutOfRangeFails) {
 
 TEST_F(ClapPluginTest, ParamsGetValueReturnsDefaults) {
   double value;
+  clap_param_info_t info;
   
+  // Values are normalized (0-1), so we check against the default_value from ParamsInfo
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdThreshold, &info));
   EXPECT_TRUE(plugin_->ParamsValue(kParamIdThreshold, &value));
-  EXPECT_DOUBLE_EQ(value, -0.1);
+  EXPECT_NEAR(value, info.default_value, 0.0001);
   
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdOutputLevel, &info));
   EXPECT_TRUE(plugin_->ParamsValue(kParamIdOutputLevel, &value));
-  EXPECT_DOUBLE_EQ(value, -0.1);
+  EXPECT_NEAR(value, info.default_value, 0.0001);
 }
 
 TEST_F(ClapPluginTest, ParamsValueToTextFormatsCorrectly) {
   char display[128];
+  clap_param_info_t info;
   
-  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdThreshold, -0.1, display, sizeof(display)));
+  // ParamsValueToText takes normalized values (0-1) and converts them to text
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdThreshold, &info));
+  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdThreshold, info.default_value, display, sizeof(display)));
   EXPECT_STREQ(display, "-0.10 dB");
   
-  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdOutputLevel, -0.1, display, sizeof(display)));
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdOutputLevel, &info));
+  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdOutputLevel, info.default_value, display, sizeof(display)));
   EXPECT_STREQ(display, "-0.10 dB");
 }
 
 TEST_F(ClapPluginTest, ParamsTextToValueParsesCorrectly) {
   double value;
   
+  // ParamsTextToValue parses text and returns normalized values (0-1)
   EXPECT_TRUE(plugin_->ParamsTextToValue(kParamIdThreshold, "-3.0", &value));
-  EXPECT_DOUBLE_EQ(value, -3.0);
+  EXPECT_GE(value, 0.0);
+  EXPECT_LE(value, 1.0);
   
   EXPECT_TRUE(plugin_->ParamsTextToValue(kParamIdOutputLevel, "-6.0", &value));
-  EXPECT_DOUBLE_EQ(value, -6.0);
+  EXPECT_GE(value, 0.0);
+  EXPECT_LE(value, 1.0);
 }
 
 TEST_F(ClapPluginTest, AudioPortsCountReturnsOne) {

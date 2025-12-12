@@ -89,9 +89,12 @@ TEST_F(ClapDelayPluginTest, ParamsInfoOutOfBoundsReturnsFalse) {
 TEST_F(ClapDelayPluginTest, ParamsValueToTextFormatsCorrectly) {
   char display[256];
   
+  // ParamsValueToText takes normalized values (0-1)
+  // Delay time range is 0-1000ms, so 0.25 * 1000 = 250ms
   EXPECT_TRUE(plugin_->ParamsValueToText(0, 0.25, display, sizeof(display)));
-  EXPECT_STREQ(display, "500.0 ms");
+  EXPECT_STREQ(display, "250.0 ms");
   
+  // Mix range is 0-1 (0-100%), so 0.5 = 50%
   EXPECT_TRUE(plugin_->ParamsValueToText(1, 0.5, display, sizeof(display)));
   EXPECT_STREQ(display, "50.0%");
 }

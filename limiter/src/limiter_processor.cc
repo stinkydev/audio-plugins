@@ -22,7 +22,7 @@ inline float DbToLinear(float db) {
 }
 
 inline float LinearToDb(float linear) {
-  return 20.0f * std::log10f(std::max(linear, kEpsilon));
+  return 20.0f * ::log10f(std::max(linear, kEpsilon));
 }
 
 }  // namespace

@@ -146,7 +146,7 @@ void ConvertToDb(float* dest, const float* src, size_t count) {
   // Use scalar implementation
   for (size_t i = 0; i < count; ++i) {
     const float abs_val = std::max(std::abs(src[i]), kEpsilon);
-    dest[i] = 20.0f * std::log10f(abs_val);
+    dest[i] = 20.0f * ::log10f(abs_val);
   }
 }
 

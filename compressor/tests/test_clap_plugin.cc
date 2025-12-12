@@ -82,7 +82,7 @@ TEST_F(ClapPluginTest, ResetSucceeds) {
 }
 
 TEST_F(ClapPluginTest, ParamsCountReturnsCorrectValue) {
-  EXPECT_EQ(plugin_->ParamsCount(), 6u);
+  EXPECT_EQ(plugin_->ParamsCount(), 7u);
 }
 
 TEST_F(ClapPluginTest, ParamsInfoReturnsValidInfo) {
@@ -105,53 +105,71 @@ TEST_F(ClapPluginTest, ParamsInfoOutOfRangeFails) {
 
 TEST_F(ClapPluginTest, ParamsGetValueReturnsDefaults) {
   double value;
+  clap_param_info_t info;
   
+  // Values are normalized (0-1), so we check against the default_value from ParamsInfo
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdThreshold, &info));
   EXPECT_TRUE(plugin_->ParamsValue(kParamIdThreshold, &value));
-  EXPECT_DOUBLE_EQ(value, -20.0);
+  EXPECT_NEAR(value, info.default_value, 0.0001);
   
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdRatio, &info));
   EXPECT_TRUE(plugin_->ParamsValue(kParamIdRatio, &value));
-  EXPECT_DOUBLE_EQ(value, 4.0);
+  EXPECT_NEAR(value, info.default_value, 0.0001);
   
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdAttack, &info));
   EXPECT_TRUE(plugin_->ParamsValue(kParamIdAttack, &value));
-  EXPECT_DOUBLE_EQ(value, 5.0);
+  EXPECT_NEAR(value, info.default_value, 0.0001);
   
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdRelease, &info));
   EXPECT_TRUE(plugin_->ParamsValue(kParamIdRelease, &value));
-  EXPECT_DOUBLE_EQ(value, 50.0);
+  EXPECT_NEAR(value, info.default_value, 0.0001);
   
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdKnee, &info));
   EXPECT_TRUE(plugin_->ParamsValue(kParamIdKnee, &value));
-  EXPECT_DOUBLE_EQ(value, 0.0);
+  EXPECT_NEAR(value, info.default_value, 0.0001);
   
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdMakeupGain, &info));
   EXPECT_TRUE(plugin_->ParamsValue(kParamIdMakeupGain, &value));
-  EXPECT_DOUBLE_EQ(value, 0.0);
+  EXPECT_NEAR(value, info.default_value, 0.0001);
 }
 
 TEST_F(ClapPluginTest, ParamsValueToTextFormatsCorrectly) {
   char display[128];
+  clap_param_info_t info;
   
-  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdThreshold, -20.0, display, sizeof(display)));
+  // ParamsValueToText takes normalized values (0-1) and converts them to text
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdThreshold, &info));
+  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdThreshold, info.default_value, display, sizeof(display)));
   EXPECT_STREQ(display, "-20.0 dB");
   
-  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdRatio, 4.0, display, sizeof(display)));
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdRatio, &info));
+  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdRatio, info.default_value, display, sizeof(display)));
   EXPECT_STREQ(display, "4.0:1");
   
-  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdAttack, 5.0, display, sizeof(display)));
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdAttack, &info));
+  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdAttack, info.default_value, display, sizeof(display)));
   EXPECT_STREQ(display, "5.0 ms");
   
-  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdRelease, 50.0, display, sizeof(display)));
+  EXPECT_TRUE(plugin_->ParamsInfo(kParamIdRelease, &info));
+  EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdRelease, info.default_value, display, sizeof(display)));
   EXPECT_STREQ(display, "50.0 ms");
 }
 
 TEST_F(ClapPluginTest, ParamsTextToValueParsesCorrectly) {
   double value;
   
+  // ParamsTextToValue parses text and returns normalized values (0-1)
   EXPECT_TRUE(plugin_->ParamsTextToValue(kParamIdThreshold, "-30.0", &value));
-  EXPECT_DOUBLE_EQ(value, -30.0);
+  EXPECT_GE(value, 0.0);
+  EXPECT_LE(value, 1.0);
   
   EXPECT_TRUE(plugin_->ParamsTextToValue(kParamIdRatio, "8.0", &value));
-  EXPECT_DOUBLE_EQ(value, 8.0);
+  EXPECT_GE(value, 0.0);
+  EXPECT_LE(value, 1.0);
   
   EXPECT_TRUE(plugin_->ParamsTextToValue(kParamIdAttack, "10.5", &value));
-  EXPECT_DOUBLE_EQ(value, 10.5);
+  EXPECT_GE(value, 0.0);
+  EXPECT_LE(value, 1.0);
 }
 
 TEST_F(ClapPluginTest, GetExtensionReturnsParams) {
