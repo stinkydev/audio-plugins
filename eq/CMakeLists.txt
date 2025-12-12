@@ -140,6 +140,6 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 install(FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/eq-plugin.ts
+    ${CMAKE_SOURCE_DIR}/ts/eq-plugin.ts
     DESTINATION ${CMAKE_INSTALL_PREFIX}/plugins
 )

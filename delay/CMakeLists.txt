@@ -122,7 +122,7 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 install(FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/delay-plugin.ts
+    ${CMAKE_SOURCE_DIR}/ts/delay-plugin.ts
     DESTINATION ${CMAKE_INSTALL_PREFIX}/plugins
 )
 

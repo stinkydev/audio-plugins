@@ -157,6 +157,6 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 install(FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/compressor-plugin.ts
+    ${CMAKE_SOURCE_DIR}/ts/compressor-plugin.ts
     DESTINATION ${CMAKE_INSTALL_PREFIX}/plugins
 )

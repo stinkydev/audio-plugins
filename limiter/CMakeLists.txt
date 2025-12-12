@@ -146,7 +146,7 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 install(FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/limiter-plugin.ts
+    ${CMAKE_SOURCE_DIR}/ts/limiter-plugin.ts
     DESTINATION ${CMAKE_INSTALL_PREFIX}/plugins
 )
 
