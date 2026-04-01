@@ -56,6 +56,59 @@ function normalizedToOutputGain(norm: number): number {
   return -12 + norm * (12 - -12);
 }
 
+// Inverse conversion functions from display value to normalized [0,1]
+function band1FreqToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, Math.log(value / 20) / Math.log(20000 / 20)));
+}
+
+function band1GainToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - -24) / (24 - -24)));
+}
+
+function band1QToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - 0.1) / (10 - 0.1)));
+}
+
+function band2FreqToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, Math.log(value / 20) / Math.log(20000 / 20)));
+}
+
+function band2GainToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - -24) / (24 - -24)));
+}
+
+function band2QToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - 0.1) / (10 - 0.1)));
+}
+
+function band3FreqToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, Math.log(value / 20) / Math.log(20000 / 20)));
+}
+
+function band3GainToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - -24) / (24 - -24)));
+}
+
+function band3QToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - 0.1) / (10 - 0.1)));
+}
+
+function band4FreqToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, Math.log(value / 20) / Math.log(20000 / 20)));
+}
+
+function band4GainToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - -24) / (24 - -24)));
+}
+
+function band4QToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - 0.1) / (10 - 0.1)));
+}
+
+function outputGainToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - -12) / (12 - -12)));
+}
+
 // Display text functions with units
 function band1FreqToText(norm: number): string {
   const freq = normalizedToBand1Freq(norm);
@@ -151,6 +204,7 @@ export const EqPlugin: IAudioPlugin = {
       defaultValue: 0.232990,
       getDisplayValue: normalizedToBand1Freq,
       getDisplayText: band1FreqToText,
+      parseEditValue: band1FreqToNormalized,
       type: 'float'
     },
     {
@@ -163,6 +217,7 @@ export const EqPlugin: IAudioPlugin = {
       defaultValue: 0.500000,
       getDisplayValue: normalizedToBand1Gain,
       getDisplayText: band1GainToText,
+      parseEditValue: band1GainToNormalized,
       type: 'float'
     },
     {
@@ -175,6 +230,7 @@ export const EqPlugin: IAudioPlugin = {
       defaultValue: 0.061313,
       getDisplayValue: normalizedToBand1Q,
       getDisplayText: band1QToText,
+      parseEditValue: band1QToNormalized,
       type: 'float'
     },
     {
@@ -214,6 +270,7 @@ export const EqPlugin: IAudioPlugin = {
       defaultValue: 0.465980,
       getDisplayValue: normalizedToBand2Freq,
       getDisplayText: band2FreqToText,
+      parseEditValue: band2FreqToNormalized,
       type: 'float'
     },
     {
@@ -226,6 +283,7 @@ export const EqPlugin: IAudioPlugin = {
       defaultValue: 0.500000,
       getDisplayValue: normalizedToBand2Gain,
       getDisplayText: band2GainToText,
+      parseEditValue: band2GainToNormalized,
       type: 'float'
     },
     {
@@ -238,6 +296,7 @@ export const EqPlugin: IAudioPlugin = {
       defaultValue: 0.090909,
       getDisplayValue: normalizedToBand2Q,
       getDisplayText: band2QToText,
+      parseEditValue: band2QToNormalized,
       type: 'float'
     },
     {
@@ -277,6 +336,7 @@ export const EqPlugin: IAudioPlugin = {
       defaultValue: 0.666667,
       getDisplayValue: normalizedToBand3Freq,
       getDisplayText: band3FreqToText,
+      parseEditValue: band3FreqToNormalized,
       type: 'float'
     },
     {
@@ -289,6 +349,7 @@ export const EqPlugin: IAudioPlugin = {
       defaultValue: 0.500000,
       getDisplayValue: normalizedToBand3Gain,
       getDisplayText: band3GainToText,
+      parseEditValue: band3GainToNormalized,
       type: 'float'
     },
     {
@@ -301,6 +362,7 @@ export const EqPlugin: IAudioPlugin = {
       defaultValue: 0.090909,
       getDisplayValue: normalizedToBand3Q,
       getDisplayText: band3QToText,
+      parseEditValue: band3QToNormalized,
       type: 'float'
     },
     {
@@ -340,6 +402,7 @@ export const EqPlugin: IAudioPlugin = {
       defaultValue: 0.867353,
       getDisplayValue: normalizedToBand4Freq,
       getDisplayText: band4FreqToText,
+      parseEditValue: band4FreqToNormalized,
       type: 'float'
     },
     {
@@ -352,6 +415,7 @@ export const EqPlugin: IAudioPlugin = {
       defaultValue: 0.500000,
       getDisplayValue: normalizedToBand4Gain,
       getDisplayText: band4GainToText,
+      parseEditValue: band4GainToNormalized,
       type: 'float'
     },
     {
@@ -364,6 +428,7 @@ export const EqPlugin: IAudioPlugin = {
       defaultValue: 0.061313,
       getDisplayValue: normalizedToBand4Q,
       getDisplayText: band4QToText,
+      parseEditValue: band4QToNormalized,
       type: 'float'
     },
     {
@@ -386,6 +451,7 @@ export const EqPlugin: IAudioPlugin = {
       defaultValue: 0.500000,
       getDisplayValue: normalizedToOutputGain,
       getDisplayText: outputGainToText,
+      parseEditValue: outputGainToNormalized,
       type: 'float'
     },
     {

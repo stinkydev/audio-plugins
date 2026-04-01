@@ -12,6 +12,15 @@ function normalizedToOutputLevel(norm: number): number {
   return -60 + norm * (0 - -60);
 }
 
+// Inverse conversion functions from display value to normalized [0,1]
+function thresholdToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - -60) / (0 - -60)));
+}
+
+function outputLevelToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - -60) / (0 - -60)));
+}
+
 // Display text functions with units
 function thresholdToText(norm: number): string {
   return `${normalizedToThreshold(norm).toFixed(1)} dB`;
@@ -42,6 +51,7 @@ export const LimiterPlugin: IAudioPlugin = {
       defaultValue: 0.998333,
       getDisplayValue: normalizedToThreshold,
       getDisplayText: thresholdToText,
+      parseEditValue: thresholdToNormalized,
       type: 'float'
     },
     {
@@ -54,6 +64,7 @@ export const LimiterPlugin: IAudioPlugin = {
       defaultValue: 0.998333,
       getDisplayValue: normalizedToOutputLevel,
       getDisplayText: outputLevelToText,
+      parseEditValue: outputLevelToNormalized,
       type: 'float'
     }
   ]

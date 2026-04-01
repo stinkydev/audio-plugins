@@ -28,6 +28,31 @@ function normalizedToMakeupGain(norm: number): number {
   return -12 + norm * (24 - -12);
 }
 
+// Inverse conversion functions from display value to normalized [0,1]
+function thresholdToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - -60) / (0 - -60)));
+}
+
+function ratioToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, Math.log(value / 1) / Math.log(100 / 1)));
+}
+
+function attackToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, Math.log(value / 0.05) / Math.log(250 / 0.05)));
+}
+
+function releaseToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, Math.log(value / 10) / Math.log(2500 / 10)));
+}
+
+function kneeToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - 0) / (12 - 0)));
+}
+
+function makeupGainToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - -12) / (24 - -12)));
+}
+
 // Display text functions with units
 function thresholdToText(norm: number): string {
   return `${normalizedToThreshold(norm).toFixed(1)} dB`;
@@ -75,6 +100,7 @@ export const CompressorPlugin: IAudioPlugin = {
       defaultValue: 0.666667,
       getDisplayValue: normalizedToThreshold,
       getDisplayText: thresholdToText,
+      parseEditValue: thresholdToNormalized,
       type: 'float'
     },
     {
@@ -87,6 +113,7 @@ export const CompressorPlugin: IAudioPlugin = {
       defaultValue: 0.301030,
       getDisplayValue: normalizedToRatio,
       getDisplayText: ratioToText,
+      parseEditValue: ratioToNormalized,
       type: 'float'
     },
     {
@@ -99,6 +126,7 @@ export const CompressorPlugin: IAudioPlugin = {
       defaultValue: 0.540691,
       getDisplayValue: normalizedToAttack,
       getDisplayText: attackToText,
+      parseEditValue: attackToNormalized,
       type: 'float'
     },
     {
@@ -111,6 +139,7 @@ export const CompressorPlugin: IAudioPlugin = {
       defaultValue: 0.291488,
       getDisplayValue: normalizedToRelease,
       getDisplayText: releaseToText,
+      parseEditValue: releaseToNormalized,
       type: 'float'
     },
     {
@@ -123,6 +152,7 @@ export const CompressorPlugin: IAudioPlugin = {
       defaultValue: 0.000000,
       getDisplayValue: normalizedToKnee,
       getDisplayText: kneeToText,
+      parseEditValue: kneeToNormalized,
       type: 'float'
     },
     {
@@ -135,6 +165,7 @@ export const CompressorPlugin: IAudioPlugin = {
       defaultValue: 0.333333,
       getDisplayValue: normalizedToMakeupGain,
       getDisplayText: makeupGainToText,
+      parseEditValue: makeupGainToNormalized,
       type: 'float'
     },
     {

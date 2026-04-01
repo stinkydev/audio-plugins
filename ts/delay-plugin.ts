@@ -12,6 +12,16 @@ function normalizedToMix(norm: number): number {
   return 0 + norm * (1 - 0);
 }
 
+// Inverse conversion functions from display value to normalized [0,1]
+function delayTimeToNormalized(value: number): number {
+  return Math.max(0, Math.min(1, (value - 0) / (1000 - 0)));
+}
+
+function mixToNormalized(value: number): number {
+  const actual = value / 100;
+  return Math.max(0, Math.min(1, (actual - 0) / (1 - 0)));
+}
+
 // Display text functions with units
 function delayTimeToText(norm: number): string {
   return `${normalizedToDelayTime(norm).toFixed(1)} ms`;
@@ -42,6 +52,7 @@ export const DelayPlugin: IAudioPlugin = {
       defaultValue: 0.000000,
       getDisplayValue: normalizedToDelayTime,
       getDisplayText: delayTimeToText,
+      parseEditValue: delayTimeToNormalized,
       type: 'float'
     },
     {
@@ -54,6 +65,7 @@ export const DelayPlugin: IAudioPlugin = {
       defaultValue: 1.000000,
       getDisplayValue: normalizedToMix,
       getDisplayText: mixToText,
+      parseEditValue: mixToNormalized,
       type: 'float'
     }
   ]

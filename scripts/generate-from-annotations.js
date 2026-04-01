@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Copyright 2025
+// Copyright Stinky Computing 2026
 // Generate TypeScript plugin definitions from C++ annotations
 
 const fs = require('fs');
@@ -135,7 +135,7 @@ function parseParameters(content) {
 function generateTypeScript(pluginMeta, params, ports) {
   const className = pluginMeta.name;
   
-  let code = `// Copyright 2025\n`;
+  let code = `// Copyright Stinky Computing 2026\n`;
   code += `// Auto-generated TypeScript definitions for ${className} plugin\n\n`;
   code += `import { IAudioPlugin } from "./audio-plugin";\n\n`;
   
@@ -157,6 +157,39 @@ function generateTypeScript(pluginMeta, params, ports) {
       } else {
         code += `function ${funcName}(norm: number): number {\n`;
         code += `  return ${min} + norm * (${max} - ${min});\n`;
+        code += `}\n\n`;
+      }
+    }
+    
+    // Generate inverse conversion functions (edit value to normalized)
+    code += `// Inverse conversion functions from display value to normalized [0,1]\n`;
+    for (const param of floatParams) {
+      const upperName = param.originalName;
+      const funcName = `${param.name}ToNormalized`;
+      const min = parseFloat(param.attrs.min);
+      const max = parseFloat(param.attrs.max);
+      const unit = param.attrs.unit || '';
+      
+      if (unit === '%') {
+        // User types percentage (e.g. 50 for 50%), convert to actual then normalize
+        if (param.attrs.scale === 'log') {
+          code += `function ${funcName}(value: number): number {\n`;
+          code += `  const actual = value / 100;\n`;
+          code += `  return Math.max(0, Math.min(1, Math.log(actual / ${min}) / Math.log(${max} / ${min})));\n`;
+          code += `}\n\n`;
+        } else {
+          code += `function ${funcName}(value: number): number {\n`;
+          code += `  const actual = value / 100;\n`;
+          code += `  return Math.max(0, Math.min(1, (actual - ${min}) / (${max} - ${min})));\n`;
+          code += `}\n\n`;
+        }
+      } else if (param.attrs.scale === 'log') {
+        code += `function ${funcName}(value: number): number {\n`;
+        code += `  return Math.max(0, Math.min(1, Math.log(value / ${min}) / Math.log(${max} / ${min})));\n`;
+        code += `}\n\n`;
+      } else {
+        code += `function ${funcName}(value: number): number {\n`;
+        code += `  return Math.max(0, Math.min(1, (value - ${min}) / (${max} - ${min})));\n`;
         code += `}\n\n`;
       }
     }
@@ -245,6 +278,7 @@ function generateTypeScript(pluginMeta, params, ports) {
     if (attrs.type !== 'bool' && attrs.type !== 'enum' && attrs.min && attrs.max) {
       code += `      getDisplayValue: normalizedTo${param.originalName},\n`;
       code += `      getDisplayText: ${param.name}ToText,\n`;
+      code += `      parseEditValue: ${param.name}ToNormalized,\n`;
     }
     
     // Add enum values if present

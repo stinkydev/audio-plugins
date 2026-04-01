@@ -9,6 +9,7 @@ export interface IAudioPluginParam {
   defaultValue: number;
   getDisplayValue?: (value: number) => number;
   getDisplayText?: (value: number) => string;
+  parseEditValue?: (value: number) => number;
   enumValues?: { value: number; label: string }[];
   type: 'float' | 'bool' | 'enum';
 }
