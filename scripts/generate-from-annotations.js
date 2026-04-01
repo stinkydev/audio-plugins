@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Copyright Stinky Computing 2026
+// Copyright Stinky Computing AB 2026
 // Generate TypeScript plugin definitions from C++ annotations
 
 const fs = require('fs');
@@ -135,7 +135,7 @@ function parseParameters(content) {
 function generateTypeScript(pluginMeta, params, ports) {
   const className = pluginMeta.name;
   
-  let code = `// Copyright Stinky Computing 2026\n`;
+  let code = `// Copyright Stinky Computing AB 2026\n`;
   code += `// Auto-generated TypeScript definitions for ${className} plugin\n\n`;
   code += `import { IAudioPlugin } from "./audio-plugin";\n\n`;
   
