@@ -1,4 +1,4 @@
-// Copyright 2025
+// Copyright Stinky Computing 2026
 // Auto-generated TypeScript definitions for Delay plugin
 
 import { IAudioPlugin } from "./audio-plugin";
@@ -34,7 +34,7 @@ function mixToText(norm: number): string {
 export const DelayPlugin: IAudioPlugin = {
   id: 'com.stinky.delay',
   filename: 'StinkyDelay.clap',
-  description: 'Simple stereo delay effect',
+  description: 'Stereo delay',
   inputPorts: [
     { id: 0, name: 'Audio Input', channels: 2, isMain: true },
   ],

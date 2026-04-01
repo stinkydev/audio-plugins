@@ -1,4 +1,4 @@
-// Copyright 2025
+// Copyright Stinky Computing 2026
 // Auto-generated TypeScript definitions for Limiter plugin
 
 import { IAudioPlugin } from "./audio-plugin";
@@ -33,7 +33,7 @@ function outputLevelToText(norm: number): string {
 export const LimiterPlugin: IAudioPlugin = {
   id: 'com.stinky.limiter',
   filename: 'StinkyLimiter.clap',
-  description: 'High-performance peak limiter with lookahead and SIMD optimization',
+  description: 'Limiter',
   inputPorts: [
     { id: 0, name: 'Audio Input', channels: 2, isMain: true },
   ],

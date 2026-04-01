@@ -17,7 +17,7 @@ namespace fast_compressor {
 // name: Compressor
 // id: com.stinky.compressor
 // filename: StinkyCompressor.clap
-// description: High-performance audio compressor with SIMD optimization
+// description: Compressor
 
 // @ts-port type=input id=0 name="Audio Input" channels=2 main=true
 // @ts-port type=input id=1 name="Sidechain Input" channels=2 main=false

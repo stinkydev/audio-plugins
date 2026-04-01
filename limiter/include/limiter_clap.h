@@ -17,7 +17,7 @@ namespace fast_limiter {
 // name: Limiter
 // id: com.stinky.limiter
 // filename: StinkyLimiter.clap
-// description: High-performance peak limiter with lookahead and SIMD optimization
+// description: Limiter
 
 // @ts-port type=input id=0 name="Audio Input" channels=2 main=true
 // @ts-port type=output id=0 name="Audio Output" channels=2 main=true

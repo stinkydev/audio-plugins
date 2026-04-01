@@ -1,4 +1,4 @@
-// Copyright 2025
+// Copyright Stinky Computing 2026
 // Auto-generated TypeScript definitions for Compressor plugin
 
 import { IAudioPlugin } from "./audio-plugin";
@@ -81,7 +81,7 @@ function makeupGainToText(norm: number): string {
 export const CompressorPlugin: IAudioPlugin = {
   id: 'com.stinky.compressor',
   filename: 'StinkyCompressor.clap',
-  description: 'High-performance audio compressor with SIMD optimization',
+  description: 'Compressor',
   inputPorts: [
     { id: 0, name: 'Audio Input', channels: 2, isMain: true },
     { id: 1, name: 'Sidechain Input', channels: 2, isMain: false },

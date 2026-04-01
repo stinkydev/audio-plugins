@@ -1,4 +1,4 @@
-// Copyright 2025
+// Copyright Stinky Computing 2026
 // Auto-generated TypeScript definitions for Eq plugin
 
 import { IAudioPlugin } from "./audio-plugin";
@@ -169,7 +169,7 @@ function outputGainToText(norm: number): string {
 export const EqPlugin: IAudioPlugin = {
   id: 'com.stinky.eq',
   filename: 'SesameEQ.clap',
-  description: 'High-quality 4-band parametric EQ with multiple filter types',
+  description: '4-band parametric EQ',
   inputPorts: [
     { id: 0, name: 'Audio Input', channels: 2, isMain: true },
   ],

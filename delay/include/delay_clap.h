@@ -17,7 +17,7 @@ namespace stinky_delay {
 // name: Delay
 // id: com.stinky.delay
 // filename: StinkyDelay.clap
-// description: Simple stereo delay effect
+// description: Stereo delay
 
 // @ts-port type=input id=0 name="Audio Input" channels=2 main=true
 // @ts-port type=output id=0 name="Audio Output" channels=2 main=true

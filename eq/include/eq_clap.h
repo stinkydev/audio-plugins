@@ -17,7 +17,7 @@ namespace fast_eq {
 // name: Eq
 // id: com.stinky.eq
 // filename: SesameEQ.clap
-// description: High-quality 4-band parametric EQ with multiple filter types
+// description: 4-band parametric EQ
 
 // @ts-port type=input id=0 name="Audio Input" channels=2 main=true
 // @ts-port type=output id=0 name="Audio Output" channels=2 main=true
