@@ -191,6 +191,8 @@ ctest -C Release -R Delay
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+Third-party dependency license details are documented in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+
 ### Dependency Licenses
 
 The project depends on the following third-party components:
