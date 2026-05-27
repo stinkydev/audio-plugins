@@ -178,6 +178,8 @@ ctest -C Release -R Delay
 ## Technical Details
 
 - **Format**: CLAP (CLever Audio Plugin) 1.2.7
+- **Project Version**: 0.0.5
+- **Release Tag**: v0.0.5
 - **Language**: C++20
 - **Build System**: CMake 3.20+
 - **Testing**: Google Test 1.14.0
@@ -188,6 +190,16 @@ ctest -C Release -R Delay
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
+
+Third-party dependency license details are documented in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+
+### Dependency Licenses
+
+The project depends on the following third-party components:
+
+- **CLAP SDK** (`free-audio/clap`, tag `1.2.7`) — MIT License
+- **GoogleTest** (`google/googletest`, tag `v1.14.0`) — BSD 3-Clause License
+- **TypeScript** (`microsoft/TypeScript`, `eq/web-ui/package.json` dev dependency) — Apache License 2.0
 
 Copyright (c) 2025 Stinky Computing
 
