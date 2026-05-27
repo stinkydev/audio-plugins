@@ -197,7 +197,7 @@ The project depends on the following third-party components:
 
 - **CLAP SDK** (`free-audio/clap`, tag `1.2.7`) — MIT License
 - **GoogleTest** (`google/googletest`, tag `v1.14.0`) — BSD 3-Clause License
-- **TypeScript** (`microsoft/TypeScript`, `eq/web-ui` dev dependency) — Apache License 2.0
+- **TypeScript** (`microsoft/TypeScript`, `eq/web-ui/package.json` dev dependency) — Apache License 2.0
 
 Copyright (c) 2025 Stinky Computing
 
