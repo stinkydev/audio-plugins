@@ -29,7 +29,8 @@ This file documents the dependency name, source, version/tag, and license.
 - Third-party licenses remain the property of their respective owners.
 - The full text of redistributed third-party licenses lives in the [`licenses/`](licenses/)
   directory. The build copies it to `build/licenses/` and `cmake --install` emits it
-  to `<prefix>/licenses/`, so downstream packagers can bundle complete attribution.
+  to `<prefix>/licenses/audio-plugins/` (project-namespaced so it doesn't collide in a
+  shared install prefix), so downstream packagers can bundle complete attribution.
 - GoogleTest and TypeScript are test-/build-only and are **not** redistributed, so their
   full license texts are not bundled alongside the binaries.
 - If dependencies are updated, this file and the bundled `licenses/` text should be

@@ -54,13 +54,16 @@ endif()
 # packagers can copy complete attribution for what is compiled into the plugins.
 # CLAP (MIT) is compiled into every shipped plugin; googletest/TypeScript are
 # test-/build-only and are not redistributed, so they are not bundled here.
+# Install into a project-namespaced subdirectory so that, when installed into a
+# shared prefix that aggregates many libraries, these files don't collide with
+# (or get mistaken for) the whole package's license.
 set(THIRD_PARTY_LICENSE_DIR "${CMAKE_SOURCE_DIR}/licenses")
 file(COPY "${THIRD_PARTY_LICENSE_DIR}/" DESTINATION "${CMAKE_BINARY_DIR}/licenses")
 install(DIRECTORY "${THIRD_PARTY_LICENSE_DIR}/"
-    DESTINATION "${CMAKE_INSTALL_PREFIX}/licenses"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}/licenses/audio-plugins"
 )
 install(FILES "${CMAKE_SOURCE_DIR}/LICENSE" "${CMAKE_SOURCE_DIR}/THIRD_PARTY_LICENSES.md"
-    DESTINATION "${CMAKE_INSTALL_PREFIX}/licenses"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}/licenses/audio-plugins"
 )
 
 # Generate TypeScript definitions from C++ annotations
