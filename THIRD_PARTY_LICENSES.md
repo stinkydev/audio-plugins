@@ -8,8 +8,8 @@ This file documents the dependency name, source, version/tag, and license.
 ### CLAP SDK
 - **Source**: https://github.com/free-audio/clap
 - **Version/Tag**: `1.2.7`
-- **How used**: CLAP plugin SDK used by all plugins via CMake `FetchContent`
-- **License**: MIT License
+- **How used**: CLAP plugin SDK compiled into all shipped plugins via CMake `FetchContent`
+- **License**: MIT License — full text reproduced in [`licenses/CLAP-LICENSE.txt`](licenses/CLAP-LICENSE.txt)
 
 ### GoogleTest
 - **Source**: https://github.com/google/googletest
@@ -27,4 +27,10 @@ This file documents the dependency name, source, version/tag, and license.
 
 - Project license is MIT; see [LICENSE](LICENSE).
 - Third-party licenses remain the property of their respective owners.
-- If dependencies are updated, this file should be updated in the same change.
+- The full text of redistributed third-party licenses lives in the [`licenses/`](licenses/)
+  directory. The build copies it to `build/licenses/` and `cmake --install` emits it
+  to `<prefix>/licenses/`, so downstream packagers can bundle complete attribution.
+- GoogleTest and TypeScript are test-/build-only and are **not** redistributed, so their
+  full license texts are not bundled alongside the binaries.
+- If dependencies are updated, this file and the bundled `licenses/` text should be
+  updated in the same change to keep the notice matching the pinned versions.
