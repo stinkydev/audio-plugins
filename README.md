@@ -5,10 +5,10 @@ A collection of high-quality CLAP audio plugins built with modern C++20.
 ## Plugins
 
 ### 🎚️ Stinky Compressor
-High-performance dynamics compressor with SIMD optimizations.
-- Threshold, ratio, attack, release controls
-- Soft knee compression
-- Auto makeup gain
+Feed-forward dynamics compressor for ambience and commentary buses.
+- Threshold, ratio, attack, release and quadratic soft knee
+- Detector hold keeps low-frequency content free of distortion
+- Linked stereo with external sidechain, predictable auto makeup
 - [Learn more](compressor/README.md)
 
 ### 🎛️ Stinky EQ
@@ -19,9 +19,10 @@ High-performance dynamics compressor with SIMD optimizations.
 - [Learn more](eq/README.md)
 
 ### 🔊 Stinky Limiter
-Transparent brick-wall limiter for mastering and final stage processing.
-- Independent threshold and output level controls
-- Fast attack and release for transparent limiting
+True-peak brick-wall limiter for live production and broadcast delivery.
+- Guaranteed ceiling with 5 ms lookahead and BS.1770 true-peak detection
+- Dual-stage release that stays stable on sustained material such as crowd noise
+- Reports its latency to the host
 - [Learn more](limiter/README.md)
 
 ### 🔁 Stinky Delay

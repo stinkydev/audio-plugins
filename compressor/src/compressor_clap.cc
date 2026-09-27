@@ -212,6 +212,7 @@ static const clap_plugin_audio_ports_t kAudioPortsExtension = {
 
 CompressorClap::CompressorClap(const clap_host_t* host)
     : host_(host),
+      gain_reduction_db_(0.0f),
       sample_rate_(44100.0),
       is_processing_(false) {
   plugin_.desc = nullptr;  // Set by factory
@@ -274,6 +275,11 @@ clap_process_status CompressorClap::Process(
     ProcessParameterChanges(process->in_events);
   }
 
+  // Hand the current parameter values to the processor. This is the only
+  // place the processor's parameters change while active, so main-thread
+  // state loads and flushes only ever touch the atomics.
+  UpdateProcessorParams();
+
   const uint32_t frame_count = process->frames_count;
   const uint32_t input_count = process->audio_inputs_count;
   const uint32_t output_count = process->audio_outputs_count;
@@ -282,46 +288,45 @@ clap_process_status CompressorClap::Process(
     return CLAP_PROCESS_SLEEP;
   }
 
-  // Get input/output channels (handle both mono and stereo)
-  const uint32_t in_channels = process->audio_inputs[0].channel_count;
-  const uint32_t out_channels = process->audio_outputs[0].channel_count;
-  
-  float* in_left = process->audio_inputs[0].data32[0];
-  float* in_right = (in_channels > 1) ? process->audio_inputs[0].data32[1] : nullptr;
-  float* out_left = process->audio_outputs[0].data32[0];
-  float* out_right = (out_channels > 1) ? process->audio_outputs[0].data32[1] : nullptr;
+  const clap_audio_buffer_t& in = process->audio_inputs[0];
+  const clap_audio_buffer_t& out = process->audio_outputs[0];
 
-  // Check for sidechain input (second input port)
+  // The ports do not advertise 64-bit support, so the host must give us
+  // 32-bit buffers. Refuse anything else rather than dereference null.
+  if (!in.data32 || !out.data32 || in.channel_count == 0 ||
+      out.channel_count == 0) {
+    return CLAP_PROCESS_ERROR;
+  }
+
+  float* in_left = in.data32[0];
+  float* in_right = (in.channel_count > 1) ? in.data32[1] : in_left;
+  float* out_left = out.data32[0];
+  float* out_right = (out.channel_count > 1) ? out.data32[1] : out_left;
+
+  // Sidechain (second input port) when the host provides usable buffers
   const float* sc_left = nullptr;
   const float* sc_right = nullptr;
   if (input_count >= 2) {
-    const uint32_t sc_channels = process->audio_inputs[1].channel_count;
-    sc_left = process->audio_inputs[1].data32[0];
-    sc_right = (sc_channels > 1) ? process->audio_inputs[1].data32[1] : sc_left;
+    const clap_audio_buffer_t& sc = process->audio_inputs[1];
+    if (sc.data32 && sc.channel_count > 0) {
+      sc_left = sc.data32[0];
+      sc_right = (sc.channel_count > 1) ? sc.data32[1] : sc_left;
+    }
   }
 
-  // Copy input to output
-  std::memcpy(out_left, in_left, frame_count * sizeof(float));
-  if (in_right && out_right) {
+  // Copy input to output (buffers may already be in place)
+  if (out_left != in_left) {
+    std::memcpy(out_left, in_left, frame_count * sizeof(float));
+  }
+  if (out_right != out_left && out_right != in_right) {
     std::memcpy(out_right, in_right, frame_count * sizeof(float));
   }
 
-  // Process compression
-  if (out_right) {
-    if (sc_left) {
-      // Use sidechain for detection
-      processor_.ProcessStereoWithSidechain(out_left, out_right, sc_left, sc_right, frame_count);
-    } else {
-      // Use main input for detection
-      processor_.ProcessStereo(out_left, out_right, frame_count);
-    }
-  } else {
-    if (sc_left) {
-      processor_.ProcessStereoWithSidechain(out_left, out_left, sc_left, sc_right, frame_count);
-    } else {
-      processor_.ProcessStereo(out_left, out_left, frame_count);
-    }
-  }
+  // Compress in place. For a mono output both pointers alias the same
+  // buffer, which the processor supports.
+  processor_.ProcessStereoWithSidechain(out_left, out_right, sc_left, sc_right,
+                                        frame_count);
+  gain_reduction_db_.store(processor_.GetGainReduction());
 
   return CLAP_PROCESS_CONTINUE;
 }
@@ -520,10 +525,11 @@ bool CompressorClap::StateLoad(const clap_istream_t* stream) noexcept {
   if (read != sizeof(values)) return false;
 
   for (int i = 0; i < kParamIdCount; ++i) {
-    param_values_[i].store(values[i]);
+    param_values_[i].store(std::clamp(values[i], 0.0, 1.0));
   }
 
-  UpdateProcessorParams();
+  // The processor picks the new values up at the start of the next block
+  // (or on activate), so no processor access from this main-thread call.
   return true;
 }
 
@@ -541,8 +547,6 @@ void CompressorClap::ProcessParameterChanges(
       SetParamValue(param_event->param_id, param_event->value);
     }
   }
-
-  UpdateProcessorParams();
 }
 
 void CompressorClap::UpdateProcessorParams() noexcept {
@@ -554,13 +558,23 @@ void CompressorClap::UpdateProcessorParams() noexcept {
   params.knee_db = static_cast<float>(NormalizedToKnee(param_values_[kParamIdKnee].load()));
   params.makeup_gain_db = static_cast<float>(NormalizedToMakeup(param_values_[kParamIdMakeupGain].load()));
   params.auto_makeup = param_values_[kParamIdAutoMakeup].load() > 0.5;
-  
-  processor_.SetParams(params);
+
+  const CompressorParams& current = processor_.GetParams();
+  const bool changed = params.threshold_db != current.threshold_db ||
+                       params.ratio != current.ratio ||
+                       params.attack_ms != current.attack_ms ||
+                       params.release_ms != current.release_ms ||
+                       params.knee_db != current.knee_db ||
+                       params.makeup_gain_db != current.makeup_gain_db ||
+                       params.auto_makeup != current.auto_makeup;
+  if (changed) {
+    processor_.SetParams(params);
+  }
 }
 
 void CompressorClap::SetParamValue(clap_id param_id, double value) noexcept {
   if (param_id < kParamIdCount) {
-    param_values_[param_id].store(value);
+    param_values_[param_id].store(std::clamp(value, 0.0, 1.0));
   }
 }
 

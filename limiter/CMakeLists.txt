@@ -107,6 +107,7 @@ if(BUILD_TESTS)
     # Test executable
     add_executable(LimiterTests
         tests/test_clap_plugin.cc
+        tests/test_limiter_processor.cc
     )
     
     target_include_directories(LimiterTests

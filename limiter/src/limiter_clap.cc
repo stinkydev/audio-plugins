@@ -17,8 +17,9 @@ constexpr const char* kPluginName = "Limiter";
 constexpr const char* kPluginVendor = "Stinky";
 constexpr const char* kPluginUrl = "https://github.com/stinkydev/audio-plugins";
 constexpr const char* kPluginVersion = "1.0.0";
-constexpr const char* kPluginDescription = 
-    "High-performance peak limiter with lookahead and SIMD optimization";
+constexpr const char* kPluginDescription =
+    "Broadcast true-peak brickwall limiter with 5 ms lookahead and "
+    "dual-stage release";
 
 constexpr const char* kFeatures[] = {
     CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
@@ -173,10 +174,21 @@ static const clap_plugin_audio_ports_t kAudioPortsExtension = {
     ClapAudioPortsGet,
 };
 
+// Latency extension callbacks
+uint32_t ClapLatencyGet(const clap_plugin_t* plugin) {
+  auto* limiter = static_cast<LimiterClap*>(plugin->plugin_data);
+  return limiter->Latency();
+}
+
+static const clap_plugin_latency_t kLatencyExtension = {
+    ClapLatencyGet,
+};
+
 }  // namespace
 
 LimiterClap::LimiterClap(const clap_host_t* host)
     : host_(host),
+      gain_reduction_db_(0.0f),
       sample_rate_(44100.0),
       is_processing_(false) {
   plugin_.desc = nullptr;  // Set by factory
@@ -193,8 +205,10 @@ LimiterClap::LimiterClap(const clap_host_t* host)
   plugin_.on_main_thread = ClapOnMainThread;
 
   // Initialize parameters to normalized defaults
-  param_values_[kParamIdThreshold].store(ThresholdToNormalized(-0.1));
-  param_values_[kParamIdOutputLevel].store(OutputLevelToNormalized(-0.1));
+  param_values_[kParamIdThreshold].store(
+      ThresholdToNormalized(kThresholdDefault));
+  param_values_[kParamIdOutputLevel].store(
+      OutputLevelToNormalized(kOutputLevelDefault));
 }
 
 bool LimiterClap::Init() noexcept {
@@ -229,10 +243,13 @@ void LimiterClap::Reset() noexcept {
 
 clap_process_status LimiterClap::Process(
     const clap_process_t* process) noexcept {
-  // Process parameter changes
+  // Process parameter changes, then hand the current values to the processor.
+  // This is the only place the processor's parameters change while active, so
+  // main-thread state loads and flushes only ever touch the atomics.
   if (process->in_events) {
     ProcessParameterChanges(process->in_events);
   }
+  UpdateProcessorParams();
 
   const uint32_t frame_count = process->frames_count;
   const uint32_t input_count = process->audio_inputs_count;
@@ -242,27 +259,33 @@ clap_process_status LimiterClap::Process(
     return CLAP_PROCESS_SLEEP;
   }
 
-  // Get input/output channels (handle both mono and stereo)
-  const uint32_t in_channels = process->audio_inputs[0].channel_count;
-  const uint32_t out_channels = process->audio_outputs[0].channel_count;
-  
-  float* in_left = process->audio_inputs[0].data32[0];
-  float* in_right = (in_channels > 1) ? process->audio_inputs[0].data32[1] : nullptr;
-  float* out_left = process->audio_outputs[0].data32[0];
-  float* out_right = (out_channels > 1) ? process->audio_outputs[0].data32[1] : nullptr;
+  const clap_audio_buffer_t& in = process->audio_inputs[0];
+  const clap_audio_buffer_t& out = process->audio_outputs[0];
 
-  // Copy input to output
-  std::memcpy(out_left, in_left, frame_count * sizeof(float));
-  if (in_right && out_right) {
+  // The port does not advertise 64-bit support, so the host must give us
+  // 32-bit buffers. Refuse anything else rather than dereference null.
+  if (!in.data32 || !out.data32 || in.channel_count == 0 ||
+      out.channel_count == 0) {
+    return CLAP_PROCESS_ERROR;
+  }
+
+  float* in_left = in.data32[0];
+  float* in_right = (in.channel_count > 1) ? in.data32[1] : in_left;
+  float* out_left = out.data32[0];
+  float* out_right = (out.channel_count > 1) ? out.data32[1] : out_left;
+
+  // Copy input to output (buffers may already be in place)
+  if (out_left != in_left) {
+    std::memcpy(out_left, in_left, frame_count * sizeof(float));
+  }
+  if (out_right != out_left && out_right != in_right) {
     std::memcpy(out_right, in_right, frame_count * sizeof(float));
   }
 
-  // Process limiting
-  if (out_right) {
-    processor_.ProcessStereo(out_left, out_right, frame_count);
-  } else {
-    processor_.ProcessStereo(out_left, out_left, frame_count);
-  }
+  // Limit in place. For a mono output both pointers alias the same buffer,
+  // which the processor supports.
+  processor_.ProcessStereo(out_left, out_right, frame_count);
+  gain_reduction_db_.store(processor_.GetGainReduction());
 
   return CLAP_PROCESS_CONTINUE;
 }
@@ -276,6 +299,9 @@ const void* LimiterClap::GetExtension(const char* id) noexcept {
   }
   if (std::strcmp(id, CLAP_EXT_STATE) == 0) {
     return &kStateExtension;
+  }
+  if (std::strcmp(id, CLAP_EXT_LATENCY) == 0) {
+    return &kLatencyExtension;
   }
   return nullptr;
 }
@@ -298,14 +324,14 @@ bool LimiterClap::ParamsInfo(uint32_t param_index,
       info->module[0] = '\0';
       info->min_value = 0.0;
       info->max_value = 1.0;
-      info->default_value = ThresholdToNormalized(-0.1);
+      info->default_value = ThresholdToNormalized(kThresholdDefault);
       break;
     case kParamIdOutputLevel:
       std::snprintf(info->name, sizeof(info->name), "Output Level");
       info->module[0] = '\0';
       info->min_value = 0.0;
       info->max_value = 1.0;
-      info->default_value = OutputLevelToNormalized(-0.1);
+      info->default_value = OutputLevelToNormalized(kOutputLevelDefault);
       break;
     default:
       return false;
@@ -388,10 +414,11 @@ bool LimiterClap::StateLoad(const clap_istream_t* stream) noexcept {
   if (read != sizeof(values)) return false;
 
   for (int i = 0; i < kParamIdCount; ++i) {
-    param_values_[i].store(values[i]);
+    param_values_[i].store(std::clamp(values[i], 0.0, 1.0));
   }
 
-  UpdateProcessorParams();
+  // The processor picks the new values up at the start of the next block
+  // (or on activate), so no processor access from this main-thread call.
   return true;
 }
 
@@ -409,21 +436,25 @@ void LimiterClap::ProcessParameterChanges(
       SetParamValue(param_event->param_id, param_event->value);
     }
   }
-
-  UpdateProcessorParams();
 }
 
 void LimiterClap::UpdateProcessorParams() noexcept {
   LimiterParams params;
-  params.threshold_db = static_cast<float>(NormalizedToThreshold(param_values_[kParamIdThreshold].load()));
-  params.output_level_db = static_cast<float>(NormalizedToOutputLevel(param_values_[kParamIdOutputLevel].load()));
-  
-  processor_.SetParams(params);
+  params.threshold_db = static_cast<float>(
+      NormalizedToThreshold(param_values_[kParamIdThreshold].load()));
+  params.output_level_db = static_cast<float>(
+      NormalizedToOutputLevel(param_values_[kParamIdOutputLevel].load()));
+
+  const LimiterParams& current = processor_.GetParams();
+  if (params.threshold_db != current.threshold_db ||
+      params.output_level_db != current.output_level_db) {
+    processor_.SetParams(params);
+  }
 }
 
 void LimiterClap::SetParamValue(clap_id param_id, double value) noexcept {
   if (param_id < kParamIdCount) {
-    param_values_[param_id].store(value);
+    param_values_[param_id].store(std::clamp(value, 0.0, 1.0));
   }
 }
 
@@ -440,7 +471,7 @@ bool LimiterClap::AudioPortsGet(uint32_t index, bool is_input,
   info->channel_count = 2;
   info->flags = CLAP_AUDIO_PORT_IS_MAIN;
   info->port_type = CLAP_PORT_STEREO;
-  info->in_place_pair = is_input ? 0 : 0;
+  info->in_place_pair = 0;  // Input and output ports share id 0
 
   return true;
 }

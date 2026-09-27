@@ -1,42 +1,59 @@
 # Stinky Limiter
 
-A high-performance look-ahead brickwall limiter CLAP plugin with SIMD optimization.
+A true-peak brickwall limiter CLAP plugin for live production. It is designed to
+sit last in the chain on ambience and full-mix buses in live sports, where the
+job is to never let a peak through, stay stable on a roaring crowd, and add a
+fixed, known delay.
 
 ## Features
 
-- **Brickwall Limiting**: Hard ceiling prevents any signal from exceeding the threshold
-- **5ms Lookahead**: Fixed lookahead buffer for transparent limiting without distortion
-- **Instant Attack**: 0.1ms attack time for catching all transients
-- **Fast Release**: 50ms release for natural dynamics recovery
-- **Output Level Control**: Set target output level independently of threshold
-- **SIMD Optimized**: AVX2 acceleration for efficient processing
-- **Stereo Linking**: True stereo processing with linked peak detection
-- **Zero Latency Option**: Minimal 5ms latency for real-time performance
+- **Guaranteed ceiling**: the sample-peak ceiling is enforced by construction,
+  not by tuning. No sample leaves the plugin above the output level.
+- **True-peak detection**: peaks are measured on a 4x oversampled signal using
+  the ITU-R BS.1770-4 interpolation filter, so inter-sample overs that would
+  clip a converter or an encoder are caught (2x at 88.2/96 kHz).
+- **5 ms lookahead**: gain reduction ramps in linearly over 5 ms ahead of the
+  peak, so transients are caught without clicks.
+- **Dual-stage release**: an 80 ms fast stage handles isolated hits (whistles,
+  ball strikes, horns). A slow stage with a 200 ms build-up and 500 ms recovery
+  takes over when limiting is sustained, so crowd roar is held at a stable
+  level instead of fluttering.
+- **Linked stereo**: one gain for both channels keeps the image steady.
+- **Reported latency**: the plugin exposes its delay through the CLAP latency
+  extension so the host can compensate.
+- **Realtime safe**: no allocations, locks or logarithms in the audio path.
 
 ## Parameters
 
 ### Threshold
 - **Range**: -60.0 dB to 0.0 dB
-- **Default**: -0.1 dB
-- **Description**: The brickwall ceiling. No signal will exceed this level. Set this to your desired maximum output level (e.g., -0.1 dB to prevent clipping).
+- **Default**: -1.0 dB
+- **Description**: The true-peak ceiling. Anything above this is limited.
 
 ### Output Level
 - **Range**: -60.0 dB to 0.0 dB
-- **Default**: -0.1 dB
-- **Description**: The target output level after limiting. This applies makeup gain to bring the limited signal to your desired level. Set this equal to threshold for transparent limiting, or lower for additional headroom.
+- **Default**: -1.0 dB
+- **Description**: The final output ceiling. The limited signal is scaled by
+  the difference between output level and threshold, so this is the level the
+  output never exceeds. Leave it equal to threshold for a plain limiter, or set
+  it lower to deliver extra headroom.
+
+The default of -1 dBTP is the EBU R128 permitted maximum. For an ATSC A/85
+chain use -2 dB. If the downstream chain still runs on an EBU R68 style PPM
+alignment, set both parameters to the permitted maximum level of that chain
+(typically -9 dBFS).
 
 ## Building
 
 ### Requirements
 - CMake 3.20 or later
 - C++20 compatible compiler (MSVC, GCC, Clang)
-- AVX2-capable CPU (for SIMD optimization)
 
 ### Build Instructions
 
 ```bash
 # Configure
-cmake -B build -DBUILD_LIMITER=ON -DENABLE_SIMD=ON
+cmake -B build -DBUILD_LIMITER=ON
 
 # Build
 cmake --build build --config Release
@@ -47,7 +64,21 @@ cmake --build build --config Release
 ### Build Options
 - `BUILD_LIMITER`: Enable building the limiter plugin (default: ON)
 - `BUILD_TESTS`: Build unit tests (default: ON)
-- `ENABLE_SIMD`: Enable AVX2 SIMD optimizations (default: ON)
+- `ENABLE_SIMD`: Allow AVX2 code generation (default: ON). The limiter's inner
+  loops are written to auto-vectorise; there are no hand-written intrinsics in
+  the limiter itself.
+
+### Tests
+
+```bash
+cmake --build build --config Release --target LimiterTests
+./build/limiter/Release/LimiterTests
+```
+
+The processor tests run at 44.1, 48, 96 and 192 kHz and check that the reported
+latency equals the measured delay, that no sample of any test signal exceeds the
+ceiling, that inter-sample peaks are detected, and that the release recovers
+after sustained limiting.
 
 ## Installation
 
@@ -71,41 +102,55 @@ Copy `StinkyLimiter.clap` to:
 
 ## Usage
 
-The Stinky Limiter is a simple, effective brickwall limiter designed for mastering and final stage limiting:
-
-1. **Basic Mastering**: Set threshold to -0.1 dB and output level to -0.1 dB for maximum loudness without clipping
-2. **Conservative Mastering**: Set threshold to -0.3 dB and output level to -0.3 dB for safer headroom
-3. **Streaming Prep**: Set threshold to -1.0 dB and output level to -1.0 dB to meet platform requirements
-4. **Safety Limiter**: Set threshold to -0.1 dB and output level to -6.0 dB for broadcast/streaming with extra headroom
+1. **Broadcast delivery (EBU R128)**: threshold -1.0 dB, output -1.0 dB.
+2. **ATSC A/85**: threshold -2.0 dB, output -2.0 dB.
+3. **Safety limiter with headroom**: threshold -1.0 dB, output -6.0 dB.
 
 ### Tips
-- The limiter has a fixed 5ms lookahead for optimal transparency
-- Attack time is instant (0.1ms) to catch all peaks
-- Release time is fixed at 50ms for natural dynamics
-- Output level can be set below threshold for additional safety margin
-- Use on master bus or individual tracks for peak control
+- Level and compress commentary and ambience separately upstream. The limiter
+  is a peak stop, not a leveller; if it is working hard on the full mix, every
+  crowd swell will duck the commentary with it.
+- The latency is fixed for a given sample rate (about 5.1 ms). Hosts that read
+  the CLAP latency extension will compensate automatically.
+- The gain reduction meter reports the deepest reduction reached in the last
+  block, in dB.
 
 ## How It Works
 
-The limiter uses a 5ms lookahead delay buffer to analyze incoming audio before it reaches the output. When peaks are detected that would exceed the threshold:
+For every frame, both channels linked:
 
-1. The detector calculates required gain reduction
-2. The envelope follower applies instant attack and fast release
-3. Gain reduction is applied to the delayed (past) audio
-4. Output is scaled to the target output level
-5. Final signal never exceeds the threshold (brickwall)
+1. The input is written to a delay line and to a short history buffer.
+2. A true-peak estimate is computed from the history using the BS.1770
+   polyphase filter. The raw sample at the filter's alignment point is always
+   included, which is what makes the sample-peak guarantee exact.
+3. The target gain is `min(1, ceiling / peak)`.
+4. Two envelopes follow the target: fast (instant attack, 80 ms release) and
+   slow (200 ms attack, 500 ms release). The smaller of the two is used, so
+   the result is never above the target.
+5. A sliding minimum holds that gain for the length of the lookahead window.
+6. A moving average over the same window turns the hold into a linear 5 ms
+   ramp that reaches the required gain exactly when the peak arrives.
+7. The gain is applied to the delayed audio, scaled to the output level, and
+   hard-clipped at the output ceiling as a guard against floating-point
+   rounding.
 
-The fixed lookahead allows the limiter to "see into the future" and apply gain reduction preemptively, preventing peaks while maintaining clarity. The output level control provides independent control over the final output gain.
+Because every averaged value at output time is a minimum over a window that
+contains the detector frame for the sample being output, the applied gain is
+always at or below the gain that sample required. That is the brickwall
+guarantee.
 
 ## Technical Details
 
 - **Processing**: 32-bit floating point
-- **Latency**: Fixed 5ms (220 samples @ 44.1kHz)
-- **Attack Time**: 0.1ms (instant)
-- **Release Time**: 50ms (fixed)
-- **Sample Rates**: All standard rates supported
-- **SIMD**: AVX2 with scalar fallback
-- **Algorithm**: Look-ahead feedforward brickwall limiter
+- **Latency**: lookahead minus one sample plus the true-peak filter delay.
+  245 samples at 48 kHz, 225 at 44.1 kHz, 485 at 96 kHz.
+- **Lookahead**: 5 ms
+- **Release**: 80 ms fast stage, 200 ms / 500 ms slow stage
+- **True peak**: 4x oversampled detection up to 48 kHz, 2x at 88.2/96 kHz,
+  sample peak at 176.4 kHz and above
+- **Sample rates**: all standard rates supported
+- **Algorithm**: feed-forward lookahead limiter with sliding-minimum hold and
+  linear ramp
 
 ## License
 
@@ -115,5 +160,5 @@ Copyright (c) 2025 Stinky Computing
 
 ## Support
 
-- GitHub: https://github.com/fastlimiter
+- GitHub: https://github.com/stinkydev/audio-plugins
 - Issues: Report bugs and request features on GitHub

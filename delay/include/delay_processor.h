@@ -22,7 +22,13 @@ class DelayProcessor {
   void Initialize(double sample_rate);
   void Reset();
   void SetParams(const DelayParams& params);
+  const DelayParams& GetParams() const { return params_; }
+
+  // In place; left and right may alias the same buffer for mono operation.
   void ProcessStereo(float* left, float* right, uint32_t frames);
+
+  // Current delay in whole samples at the initialized sample rate.
+  uint32_t GetDelaySamples() const { return delay_samples_left_; }
 
  private:
   void UpdateDelayTimes();

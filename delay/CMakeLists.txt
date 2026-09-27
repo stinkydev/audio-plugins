@@ -92,6 +92,7 @@ if(BUILD_TESTS)
     # Test executable
     add_executable(DelayTests
         tests/test_clap_plugin.cc
+        tests/test_delay_processor.cc
     )
     
     target_include_directories(DelayTests

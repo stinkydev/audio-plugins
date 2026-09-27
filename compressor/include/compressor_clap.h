@@ -92,17 +92,23 @@ class CompressorClap {
 
   const clap_plugin_t* ClapPlugin() noexcept { return &plugin_; }
 
+  // Deepest gain reduction in the last processed block (dB, <= 0)
+  float GetGainReduction() const noexcept { return gain_reduction_db_.load(); }
+
  private:
   void ProcessParameterChanges(const clap_input_events_t* events) noexcept;
+  // Push the stored parameter values into the processor. Only called from the
+  // thread that owns the processor (audio thread while active, main thread
+  // during init/activate).
   void UpdateProcessorParams() noexcept;
-  double ParamIdToValue(clap_id param_id) const noexcept;
   void SetParamValue(clap_id param_id, double value) noexcept;
 
   clap_plugin_t plugin_;
   const clap_host_t* host_;
   CompressorProcessor processor_;
-  
+
   std::atomic<double> param_values_[kParamIdCount];
+  std::atomic<float> gain_reduction_db_;
   double sample_rate_;
   bool is_processing_;
 };

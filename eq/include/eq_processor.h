@@ -28,12 +28,28 @@ struct BandParams {
   bool enabled = true;
 };
 
+inline bool operator==(const BandParams& a, const BandParams& b) {
+  return a.type == b.type && a.frequency_hz == b.frequency_hz &&
+         a.gain_db == b.gain_db && a.q == b.q && a.enabled == b.enabled;
+}
+inline bool operator!=(const BandParams& a, const BandParams& b) {
+  return !(a == b);
+}
+
 // 4-band EQ parameters
 struct EqParams {
   std::array<BandParams, 4> bands;
   float output_gain_db = 0.0f;
   bool bypass = false;
 };
+
+inline bool operator==(const EqParams& a, const EqParams& b) {
+  return a.bands == b.bands && a.output_gain_db == b.output_gain_db &&
+         a.bypass == b.bypass;
+}
+inline bool operator!=(const EqParams& a, const EqParams& b) {
+  return !(a == b);
+}
 
 // Biquad filter implementation
 class BiquadFilter {
