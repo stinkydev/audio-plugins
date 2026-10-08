@@ -9,11 +9,6 @@
 
 namespace stinky_delay {
 
-namespace {
-constexpr float kMaxDelayMs = 2000.0f;
-constexpr double kBufferSeconds = 2.5;  // headroom above the maximum delay
-}  // namespace
-
 DelayProcessor::DelayProcessor()
     : sample_rate_(44100.0),
       write_pos_(0),
@@ -26,7 +21,10 @@ void DelayProcessor::Initialize(double sample_rate) {
   if (sample_rate <= 0.0) sample_rate = 44100.0;
   sample_rate_ = sample_rate;
 
-  max_delay_samples_ = static_cast<uint32_t>(sample_rate * kBufferSeconds);
+  // One slot more than the longest delay: the read position must stay
+  // strictly behind the write position after a full wrap.
+  max_delay_samples_ = static_cast<uint32_t>(std::lround(
+      static_cast<double>(kMaxDelayMs) * 0.001 * sample_rate)) + 1;
 
   // assign() rather than resize() so a re-activation never replays audio
   // left in the buffer from the previous run.

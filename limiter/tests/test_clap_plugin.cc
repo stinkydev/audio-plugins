@@ -377,6 +377,19 @@ TEST_F(ProcessTest, GainReductionIsApplied) {
   EXPECT_LT(gain_reduction, 0.0f);  // Should be negative (reduction)
 }
 
+TEST_F(ProcessTest, ResetClearsGainReductionMeter) {
+  for (size_t i = 0; i < kBufferSize; ++i) {
+    input_left_[i] = 2.0f;
+    input_right_[i] = 2.0f;
+  }
+  plugin_->Process(&process_);
+  ASSERT_LT(plugin_->GetGainReduction(), 0.0f);
+
+  // reset() zeroes the processor's meter; the wrapper's copy must follow.
+  plugin_->Reset();
+  EXPECT_FLOAT_EQ(plugin_->GetGainReduction(), 0.0f);
+}
+
 }  // namespace
 }  // namespace fast_limiter
 

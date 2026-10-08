@@ -9,8 +9,12 @@
 
 namespace stinky_delay {
 
+// Longest delay the processor supports. The CLAP parameter range is derived
+// from this so there is a single source of truth.
+constexpr float kMaxDelayMs = 1000.0f;
+
 struct DelayParams {
-  float delay_time_ms = 0.0f;  // 0 to 2000 ms
+  float delay_time_ms = 0.0f;  // 0 to kMaxDelayMs
   float mix = 1.0f;            // 0.0 to 1.0 (dry/wet)
 };
 

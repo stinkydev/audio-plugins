@@ -91,6 +91,7 @@ Copy the built plugin to your CLAP plugin directory:
 include/
 ├── compressor_processor.h  # Core DSP algorithm
 ├── compressor_clap.h       # CLAP wrapper interface
+├── fast_math.h             # log2 / exp2 approximations, scalar and AVX2
 └── simd_utils.h            # SIMD operations
 
 src/
@@ -120,11 +121,20 @@ level detector placed after the gain computer in the dB domain:
 The gain reduction meter reports the deepest reduction reached in the most
 recent block.
 
-### SIMD utilities
+### SIMD
 
-`simd_utils` provides AVX2 vector helpers with runtime detection and a scalar
-fallback. They are built and tested but the compressor's own loop is scalar;
-its cost is dominated by one logarithm and one power per frame.
+Each block is processed in three passes over 64-frame chunks. The gain
+computer (peak, level in dB, static curve) and the gain stage (dB to linear,
+makeup, apply) depend only on their own sample and run eight frames at a time
+with AVX2 when `ENABLE_SIMD` is on. The envelope between them is recursive
+and stays scalar. The dB conversions use the log2 / exp2 approximations in
+`fast_math.h`, accurate to about 1e-6 dB, instead of `log10` and `pow`. With
+`ENABLE_SIMD` off, scalar code performs the same operations in the same order,
+so the two builds differ only by fused-multiply-add rounding. The result does
+not depend on the chunk size.
+
+`simd_utils` provides older AVX2 buffer helpers with a scalar fallback. They
+are built and tested but not used by the compressor.
 
 ### Code Style
 

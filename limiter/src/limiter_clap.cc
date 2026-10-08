@@ -219,8 +219,11 @@ bool LimiterClap::Init() noexcept {
 bool LimiterClap::Activate(double sample_rate, uint32_t /*min_frames*/,
                             uint32_t /*max_frames*/) noexcept {
   sample_rate_ = sample_rate;
+  // Sync the stored parameters first: Initialize() resets the processor, and
+  // the state it resets to must already reflect a preset loaded before
+  // activation.
+  UpdateProcessorParams();
   processor_.Initialize(sample_rate);
-  UpdateProcessorParams();  // Sync stored parameter values with processor
   return true;
 }
 
@@ -239,6 +242,7 @@ void LimiterClap::StopProcessing() noexcept {
 
 void LimiterClap::Reset() noexcept {
   processor_.Reset();
+  gain_reduction_db_.store(0.0f);
 }
 
 clap_process_status LimiterClap::Process(

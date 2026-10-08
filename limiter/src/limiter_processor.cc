@@ -26,8 +26,20 @@
 #include "limiter_processor.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
+
+// The true-peak detector has an AVX2 path (one 8-lane fused multiply-add per
+// tap) and a portable path. ENABLE_SIMD in CMake defines USE_SIMD and sets the
+// AVX2 code-generation flags; MSVC implies FMA with /arch:AVX2.
+#if defined(USE_SIMD) && defined(__AVX2__) && \
+    (defined(__FMA__) || defined(_MSC_VER))
+#include <immintrin.h>
+#define LIMITER_DETECTOR_AVX2 1
+#else
+#define LIMITER_DETECTOR_AVX2 0
+#endif
 
 namespace fast_limiter {
 
@@ -63,6 +75,39 @@ constexpr float kTruePeakCoeffs[kTruePeakPhases][kTruePeakTaps] = {
      -0.1022949218750f, 0.9721679687500f, 0.1373291015625f, -0.0594482421875f,
      0.0332031250000f, -0.0196533203125f, 0.0109863281250f, 0.0017089843750f},
 };
+
+// Detector lane layout: phases 0-3 of the left channel in lanes 0-3, the same
+// phases of the right channel in lanes 4-7.
+constexpr size_t kDetectorLanes = 2 * kTruePeakPhases;
+
+// The same table tap-major and duplicated into both channel halves, so the
+// detector walks the taps once and updates every lane side by side (see
+// DetectPeak). 32-byte aligned for the AVX2 loads.
+struct alignas(32) TapCoeffs {
+  float c[kDetectorLanes];
+};
+constexpr std::array<TapCoeffs, kTruePeakTaps> BuildDetectorCoeffs() {
+  std::array<TapCoeffs, kTruePeakTaps> by_tap{};
+  for (size_t k = 0; k < kTruePeakTaps; ++k) {
+    for (size_t p = 0; p < kTruePeakPhases; ++p) {
+      by_tap[k].c[p] = kTruePeakCoeffs[p][k];
+      by_tap[k].c[kTruePeakPhases + p] = kTruePeakCoeffs[p][k];
+    }
+  }
+  return by_tap;
+}
+constexpr std::array<TapCoeffs, kTruePeakTaps> kDetectorCoeffs =
+    BuildDetectorCoeffs();
+static_assert(kTruePeakTaps % 2 == 0,
+              "the detector sums even and odd taps in two interleaved chains");
+
+#if LIMITER_DETECTOR_AVX2
+// One input sample pair spread over the detector lanes: [l l l l r r r r].
+inline __m256 ChannelPair(const float* left, const float* right) {
+  return _mm256_insertf128_ps(_mm256_castps128_ps256(_mm_broadcast_ss(left)),
+                              _mm_broadcast_ss(right), 1);
+}
+#endif
 
 inline float DbToLinear(float db) { return std::pow(10.0f, db / 20.0f); }
 
@@ -100,8 +145,8 @@ LimiterProcessor::LimiterProcessor()
       history_pos_(0),
       delay_mask_(0),
       delay_pos_(0),
-      fast_env_(1.0f),
-      slow_env_(1.0f),
+      fast_env_(1.0),
+      slow_env_(1.0),
       min_mask_(0),
       min_head_(0),
       min_tail_(0),
@@ -171,8 +216,8 @@ void LimiterProcessor::Reset() {
   std::fill(delay_right_.begin(), delay_right_.end(), 0.0f);
   delay_pos_ = 0;
 
-  fast_env_ = 1.0f;
-  slow_env_ = 1.0f;
+  fast_env_ = 1.0;
+  slow_env_ = 1.0;
 
   min_head_ = 0;
   min_tail_ = 0;
@@ -194,27 +239,60 @@ float LimiterProcessor::DetectPeak() const {
   float peak = std::max(std::abs(history_left_[aligned]),
                         std::abs(history_right_[aligned]));
 
-  if (oversampling_ > 1) {
-    float xl[kTruePeakTaps];
-    float xr[kTruePeakTaps];
-    for (size_t k = 0; k < kTruePeakTaps; ++k) {
-      const size_t idx = (history_pos_ - k) & kHistoryMask;
-      xl[k] = history_left_[idx];
-      xr[k] = history_right_[idx];
-    }
+  if (oversampling_ == 1) return peak;
 
-    // 4x uses all phases; 2x uses phases 0 and 2 (the half-sample point).
-    const size_t phase_step = (oversampling_ == 4) ? 1 : 2;
-    for (size_t p = 0; p < kTruePeakPhases; p += phase_step) {
-      const float* c = kTruePeakCoeffs[p];
-      float al = 0.0f;
-      float ar = 0.0f;
-      for (size_t k = 0; k < kTruePeakTaps; ++k) {
-        al += c[k] * xl[k];
-        ar += c[k] * xr[k];
-      }
-      peak = std::max(peak, std::max(std::abs(al), std::abs(ar)));
+  // All four phases of both channels are summed side by side, one tap at a
+  // time: eight independent accumulators updated elementwise, as two
+  // interleaved chains (even taps, odd taps) that are added at the end. The
+  // obvious form (one dot product per phase) is a serial chain of twelve
+  // dependent multiply-adds per phase and is several times slower. The two
+  // paths add in the same order and differ only in the rounding of the fused
+  // multiply-add.
+  alignas(32) float acc[kDetectorLanes] = {};
+#if LIMITER_DETECTOR_AVX2
+  __m256 even = _mm256_setzero_ps();
+  __m256 odd = _mm256_setzero_ps();
+  for (size_t k = 0; k < kTruePeakTaps; k += 2) {
+    const size_t idx0 = (history_pos_ - k) & kHistoryMask;
+    const size_t idx1 = (history_pos_ - k - 1) & kHistoryMask;
+    even = _mm256_fmadd_ps(_mm256_load_ps(kDetectorCoeffs[k].c),
+                           ChannelPair(&history_left_[idx0],
+                                       &history_right_[idx0]),
+                           even);
+    odd = _mm256_fmadd_ps(_mm256_load_ps(kDetectorCoeffs[k + 1].c),
+                          ChannelPair(&history_left_[idx1],
+                                      &history_right_[idx1]),
+                          odd);
+  }
+  _mm256_store_ps(acc, _mm256_add_ps(even, odd));
+#else
+  float even[kDetectorLanes] = {};
+  float odd[kDetectorLanes] = {};
+  for (size_t k = 0; k < kTruePeakTaps; k += 2) {
+    const size_t idx0 = (history_pos_ - k) & kHistoryMask;
+    const size_t idx1 = (history_pos_ - k - 1) & kHistoryMask;
+    const float* c0 = kDetectorCoeffs[k].c;
+    const float* c1 = kDetectorCoeffs[k + 1].c;
+    for (size_t p = 0; p < kTruePeakPhases; ++p) {
+      even[p] += c0[p] * history_left_[idx0];
+      even[kTruePeakPhases + p] +=
+          c0[kTruePeakPhases + p] * history_right_[idx0];
+      odd[p] += c1[p] * history_left_[idx1];
+      odd[kTruePeakPhases + p] +=
+          c1[kTruePeakPhases + p] * history_right_[idx1];
     }
+  }
+  for (size_t i = 0; i < kDetectorLanes; ++i) acc[i] = even[i] + odd[i];
+#endif
+
+  // 4x uses all phases. 2x uses phases 0 and 2, which sit half a sample
+  // apart. Every phase is offset 1/8 sample from the input grid, so the
+  // worst-case distance to a true peak is the same as with a dedicated 2x
+  // filter.
+  const size_t phase_step = (oversampling_ == 4) ? 1 : 2;
+  for (size_t p = 0; p < kTruePeakPhases; p += phase_step) {
+    peak = std::max(peak, std::max(std::abs(acc[p]),
+                                   std::abs(acc[kTruePeakPhases + p])));
   }
   return peak;
 }
@@ -294,7 +372,7 @@ inline void LimiterProcessor::ProcessFrame(float in_left, float in_right,
     slow_env_ += slow_release_k_ * (target - slow_env_);
   }
 
-  const float released = std::min(fast_env_, slow_env_);
+  const float released = static_cast<float>(std::min(fast_env_, slow_env_));
 
   // Hold for the lookahead window, then ramp linearly over it.
   const float held = SlidingMinimum(released);

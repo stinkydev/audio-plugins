@@ -87,13 +87,18 @@ TEST_F(DelayProcessorTest, DelayTimeRoundsToNearestSample) {
 }
 
 TEST_F(DelayProcessorTest, MaximumDelayFitsInBuffer) {
-  Set(2000.0f, 1.0f);
-  EXPECT_EQ(processor_.GetDelaySamples(), 96000u);
-  const size_t n = 96000 + 480;
+  Set(kMaxDelayMs, 1.0f);
+  EXPECT_EQ(processor_.GetDelaySamples(), 48000u);
+  const size_t n = 48000 + 480;
   std::vector<float> left(n, 0.0f), right(n, 0.0f);
   left[0] = right[0] = 1.0f;
   processor_.ProcessStereo(left.data(), right.data(), static_cast<uint32_t>(n));
-  EXPECT_EQ(FirstIndexAbove(left, 0.5f), 96000);
+  EXPECT_EQ(FirstIndexAbove(left, 0.5f), 48000);
+}
+
+TEST_F(DelayProcessorTest, DelayAboveMaximumIsClamped) {
+  Set(2.0f * kMaxDelayMs, 1.0f);
+  EXPECT_EQ(processor_.GetDelaySamples(), 48000u);
 }
 
 TEST_F(DelayProcessorTest, MixBlendsDryAndWet) {

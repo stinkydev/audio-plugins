@@ -246,8 +246,11 @@ bool CompressorClap::Init() noexcept {
 bool CompressorClap::Activate(double sample_rate, uint32_t /*min_frames*/,
                                uint32_t /*max_frames*/) noexcept {
   sample_rate_ = sample_rate;
+  // Sync the stored parameters first: Initialize() resets the processor and
+  // snaps its smoothers to the current targets, so those must already reflect
+  // a preset loaded before activation.
+  UpdateProcessorParams();
   processor_.Initialize(sample_rate);
-  UpdateProcessorParams();  // Sync stored parameter values with processor
   return true;
 }
 
@@ -266,6 +269,7 @@ void CompressorClap::StopProcessing() noexcept {
 
 void CompressorClap::Reset() noexcept {
   processor_.Reset();
+  gain_reduction_db_.store(0.0f);
 }
 
 clap_process_status CompressorClap::Process(

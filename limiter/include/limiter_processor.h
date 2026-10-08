@@ -119,9 +119,11 @@ class LimiterProcessor {
   size_t delay_mask_;
   size_t delay_pos_;
 
-  // Release envelopes (linear gain, 1.0 = no reduction)
-  float fast_env_;
-  float slow_env_;
+  // Release envelopes (linear gain, 1.0 = no reduction). Kept in double: in
+  // float the one-pole update k * (1 - env) falls below half an ulp of env
+  // while still ~1e-3 short of unity, so the gain would never fully release.
+  double fast_env_;
+  double slow_env_;
 
   // Sliding minimum (monotonic deque over a ring buffer)
   std::vector<float> min_values_;

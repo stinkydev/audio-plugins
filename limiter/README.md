@@ -21,7 +21,8 @@ fixed, known delay.
 - **Linked stereo**: one gain for both channels keeps the image steady.
 - **Reported latency**: the plugin exposes its delay through the CLAP latency
   extension so the host can compensate.
-- **Realtime safe**: no allocations, locks or logarithms in the audio path.
+- **Realtime safe**: no allocations or locks in the audio path, and no
+  per-sample logarithms (one `log10` per block feeds the gain-reduction meter).
 
 ## Parameters
 
@@ -64,9 +65,11 @@ cmake --build build --config Release
 ### Build Options
 - `BUILD_LIMITER`: Enable building the limiter plugin (default: ON)
 - `BUILD_TESTS`: Build unit tests (default: ON)
-- `ENABLE_SIMD`: Allow AVX2 code generation (default: ON). The limiter's inner
-  loops are written to auto-vectorise; there are no hand-written intrinsics in
-  the limiter itself.
+- `ENABLE_SIMD`: AVX2 code generation (default: ON). The true-peak detector
+  has a hand-written AVX2 path that evaluates all four interpolation phases of
+  both channels with one 8-lane fused multiply-add per filter tap; the rest of
+  the limiter is plain C++. With it off, a portable loop that sums in the same
+  order is used instead, so results differ only by fused-multiply-add rounding.
 
 ### Tests
 
@@ -143,7 +146,7 @@ guarantee.
 
 - **Processing**: 32-bit floating point
 - **Latency**: lookahead minus one sample plus the true-peak filter delay.
-  245 samples at 48 kHz, 225 at 44.1 kHz, 485 at 96 kHz.
+  245 samples at 48 kHz, 226 at 44.1 kHz, 485 at 96 kHz.
 - **Lookahead**: 5 ms
 - **Release**: 80 ms fast stage, 200 ms / 500 ms slow stage
 - **True peak**: 4x oversampled detection up to 48 kHz, 2x at 88.2/96 kHz,

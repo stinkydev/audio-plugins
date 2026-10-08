@@ -412,5 +412,76 @@ TEST_F(CompressorProcessorTest, ExtremeRatioWorks) {
   }
 }
 
+// Straight per-sample transcription of the algorithm with exact std::log10
+// and std::pow. The processor runs it in chunked passes with fast log2/exp2
+// approximations (and AVX2 when enabled); this pins it to the exact version.
+void ReferenceProcess(const CompressorParams& p, double sr,
+                      std::vector<float>& left, std::vector<float>& right) {
+  auto step = [sr](float ms) {
+    const float s = ms * 0.001f * static_cast<float>(sr);
+    return s <= 1.0f ? 1.0f : 1.0f - std::exp(-1.0f / s);
+  };
+  const float attack_k = step(p.attack_ms);
+  const float release_k = step(p.release_ms);
+  const float makeup_k = step(10.0f);
+  const size_t hold_samples = static_cast<size_t>(std::lround(0.015 * sr));
+  const float makeup_target = std::pow(10.0f, p.makeup_gain_db / 20.0f);
+
+  float env = 0.0f;
+  float makeup = makeup_target;
+  size_t hold = 0;
+  for (size_t i = 0; i < left.size(); ++i) {
+    const float peak = std::max(
+        std::max(std::abs(left[i]), std::abs(right[i])), 1.5849e-5f);
+    const float level = 20.0f * std::log10(peak);
+    const float target =
+        -ReferenceGainDb(level, p.threshold_db, p.ratio, p.knee_db);
+    if (target >= env) {
+      env += attack_k * (target - env);
+      hold = hold_samples;
+    } else if (hold > 0) {
+      --hold;
+    } else {
+      env += release_k * (target - env);
+    }
+    env = std::max(env, 0.0f);
+    makeup += makeup_k * (makeup_target - makeup);
+    const float gain = std::pow(10.0f, -env / 20.0f) * makeup;
+    left[i] *= gain;
+    right[i] *= gain;
+  }
+}
+
+TEST_F(CompressorProcessorTest, ProcessMatchesExactMathReference) {
+  CompressorParams params;
+  params.threshold_db = -18.0f;
+  params.ratio = 3.0f;
+  params.attack_ms = 1.0f;
+  params.release_ms = 20.0f;
+  params.knee_db = 6.0f;
+  params.makeup_gain_db = 3.0f;
+  processor_.SetParams(params);
+  processor_.Reset();  // makeup smoother starts at the new target
+
+  // 1000 frames: not a multiple of the internal chunk, so the vector lanes
+  // and the scalar tail are both exercised. The amplitude sweeps up through
+  // the knee and the two channels differ.
+  const size_t n = 1000;
+  std::vector<float> left(n), right(n);
+  for (size_t i = 0; i < n; ++i) {
+    const float amp = 0.02f + 0.6f * static_cast<float>(i) / n;
+    left[i] = amp * static_cast<float>(std::sin(2.0 * kPi * 440.0 * i / kSampleRate));
+    right[i] = 0.5f * amp * static_cast<float>(std::cos(2.0 * kPi * 330.0 * i / kSampleRate));
+  }
+  std::vector<float> ref_left = left, ref_right = right;
+  ReferenceProcess(params, kSampleRate, ref_left, ref_right);
+  processor_.ProcessStereo(left.data(), right.data(), n);
+
+  for (size_t i = 0; i < n; ++i) {
+    EXPECT_NEAR(left[i], ref_left[i], 2e-5f) << "frame " << i;
+    EXPECT_NEAR(right[i], ref_right[i], 2e-5f) << "frame " << i;
+  }
+}
+
 }  // namespace
 }  // namespace fast_compressor

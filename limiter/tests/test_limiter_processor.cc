@@ -204,6 +204,28 @@ TEST_P(LimiterProcessorTest, ReleasesAfterSustainedLimiting) {
   EXPECT_NEAR(late_peak, 0.5f, 0.01f);
 }
 
+TEST_P(LimiterProcessorTest, ReleaseSettlesExactlyAtUnity) {
+  // After limiting stops the gain must return to exactly 1.0, not stall a
+  // fraction of a dB below it. The envelopes used to be float one-pole
+  // smoothers, whose update k * (1 - env) underflows below half an ulp of env
+  // at env ~ 0.999, leaving a permanent residual reduction on the meter.
+  const size_t burst = static_cast<size_t>(0.5 * sample_rate_);
+  std::vector<float> l(burst, 2.0f), r(burst, 2.0f);
+  ProcessInBlocks(processor_, l, r);
+  ASSERT_LT(processor_.GetGainReduction(), -1.0f);
+
+  // 20 time constants of the slow (500 ms) release
+  const size_t tail = static_cast<size_t>(10.0 * sample_rate_);
+  std::vector<float> zl(tail, 0.0f), zr(tail, 0.0f);
+  ProcessInBlocks(processor_, zl, zr);
+  EXPECT_FLOAT_EQ(processor_.GetGainReduction(), 0.0f);
+
+  // ... and a signal under the ceiling then passes at exactly unity gain
+  std::vector<float> ql(4096, 0.5f), qr(4096, 0.5f);
+  ProcessInBlocks(processor_, ql, qr);
+  EXPECT_FLOAT_EQ(MaxAbs(ql), 0.5f);
+}
+
 TEST_P(LimiterProcessorTest, ResetClearsState) {
   std::vector<float> l(4096, 2.0f), r(4096, 2.0f);
   ProcessInBlocks(processor_, l, r);

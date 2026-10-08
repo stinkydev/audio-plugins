@@ -70,7 +70,10 @@ cmake .. -DBUILD_COMPRESSOR=ON -DBUILD_EQ=OFF -DBUILD_LIMITER=OFF -DBUILD_DELAY=
 # Disable tests
 cmake .. -DBUILD_TESTS=OFF
 
-# Disable SIMD optimizations (compressor only)
+# Disable benchmarks
+cmake .. -DBUILD_BENCHMARKS=OFF
+
+# Disable SIMD optimizations (compressor and limiter)
 cmake .. -DENABLE_SIMD=OFF
 
 # Combine options
@@ -117,13 +120,15 @@ audio-plugins/
 ├── CMakeLists.txt          # Root build configuration
 ├── README.md               # This file
 ├── plugins.ts              # Central TypeScript exports
+├── bench/                  # Shared benchmark support header
 ├── compressor/             # Compressor plugin
 │   ├── CMakeLists.txt
 │   ├── README.md
 │   ├── compressor-plugin.ts
 │   ├── include/
 │   ├── src/
-│   └── tests/
+│   ├── tests/
+│   └── bench/
 ├── eq/                     # EQ plugin
 │   ├── CMakeLists.txt
 │   ├── README.md
@@ -131,6 +136,7 @@ audio-plugins/
 │   ├── include/
 │   ├── src/
 │   ├── tests/
+│   ├── bench/
 │   └── web-ui/            # Web-based EQ editor
 ├── limiter/                # Limiter plugin
 │   ├── CMakeLists.txt
@@ -138,14 +144,16 @@ audio-plugins/
 │   ├── limiter-plugin.ts
 │   ├── include/
 │   ├── src/
-│   └── tests/
+│   ├── tests/
+│   └── bench/
 └── delay/                  # Delay plugin
     ├── CMakeLists.txt
     ├── README.md
     ├── delay-plugin.ts
     ├── include/
     ├── src/
-    └── tests/
+    ├── tests/
+    └── bench/
 ```
 
 ## Development
@@ -175,6 +183,26 @@ ctest -C Release -R Eq
 ctest -C Release -R Limiter
 ctest -C Release -R Delay
 ```
+
+### Running Benchmarks
+
+Each plugin has a `<Plugin>Bench` executable that times its DSP core and its
+CLAP `Process()` call over a fixed length of audio and reports nanoseconds per
+frame plus the share of one core that costs at the stated sample rate. Build in
+Release; Debug numbers are meaningless.
+
+```powershell
+# Build and run every benchmark
+cd build
+cmake --build . --config Release --target bench
+
+# Run one directly, optionally with the audio length in seconds and run count
+.\limiter\Release\LimiterBench.exe 30 5
+```
+
+Compare the `ns/frame` column against an earlier run on the same machine to
+catch regressions. Each figure is the best of several runs, so a few percent
+of noise between runs is normal.
 
 ## Technical Details
 
