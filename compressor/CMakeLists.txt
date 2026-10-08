@@ -49,6 +49,7 @@ set(SOURCES
 set(HEADERS
     include/compressor_processor.h
     include/compressor_clap.h
+    include/fast_math.h
     include/simd_utils.h
 )
 
@@ -107,6 +108,7 @@ if(BUILD_TESTS)
     # Test sources
     set(TEST_SOURCES
         tests/test_compressor_processor.cc
+        tests/test_fast_math.cc
         tests/test_simd_utils.cc
         tests/test_clap_plugin.cc
     )
@@ -148,6 +150,27 @@ if(BUILD_TESTS)
     # Register tests with CTest
     include(GoogleTest)
     gtest_discover_tests(CompressorTests)
+endif()
+
+# Benchmarks
+if(NOT DEFINED BUILD_BENCHMARKS)
+    option(BUILD_BENCHMARKS "Build throughput benchmarks" ON)
+endif()
+
+if(BUILD_BENCHMARKS)
+    add_executable(CompressorBench
+        bench/bench_compressor.cc
+        src/compressor_processor.cc
+        src/compressor_clap.cc
+        src/simd_utils.cc
+    )
+
+    target_include_directories(CompressorBench
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../bench
+            ${clap_SOURCE_DIR}/include
+    )
 endif()
 
 # Install plugin and TypeScript definitions

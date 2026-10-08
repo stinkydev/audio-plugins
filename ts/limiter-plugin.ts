@@ -1,4 +1,4 @@
-// Copyright Stinky Computing 2026
+// Copyright Stinky Computing AB 2026
 // Auto-generated TypeScript definitions for Limiter plugin
 
 import { IAudioPlugin } from "./audio-plugin";
@@ -48,7 +48,7 @@ export const LimiterPlugin: IAudioPlugin = {
       label: 'Threshold',
       min: 0.0,
       max: 1.0,
-      defaultValue: 0.998333,
+      defaultValue: 0.983333,
       getDisplayValue: normalizedToThreshold,
       getDisplayText: thresholdToText,
       parseEditValue: thresholdToNormalized,
@@ -61,7 +61,7 @@ export const LimiterPlugin: IAudioPlugin = {
       label: 'Output Level',
       min: 0.0,
       max: 1.0,
-      defaultValue: 0.998333,
+      defaultValue: 0.983333,
       getDisplayValue: normalizedToOutputLevel,
       getDisplayText: outputLevelToText,
       parseEditValue: outputLevelToNormalized,

@@ -168,9 +168,9 @@ EqProcessor::EqProcessor()
 }
 
 void EqProcessor::Initialize(double sample_rate) {
-  sample_rate_ = sample_rate;
+  sample_rate_ = (sample_rate > 0.0) ? sample_rate : 44100.0;
   Reset();
-  
+
   // Update all filter coefficients
   for (size_t i = 0; i < 4; ++i) {
     UpdateBandCoefficients(i);
@@ -178,47 +178,65 @@ void EqProcessor::Initialize(double sample_rate) {
 }
 
 void EqProcessor::SetParams(const EqParams& params) {
-  params_ = params;
-  
-  // Update filter coefficients for all bands
+  // Recompute only the bands that changed: coefficient updates cost a handful
+  // of transcendentals each and this is called every block.
   for (size_t i = 0; i < 4; ++i) {
+    const BandParams& next = params.bands[i];
+    const BandParams& current = params_.bands[i];
+    if (next == current) continue;
+
+    // A band that changes type or comes back from disabled starts from a
+    // clean state rather than replaying whatever it held when it stopped.
+    const bool restart = next.type != current.type ||
+                         (next.enabled && !current.enabled);
+    params_.bands[i] = next;
     UpdateBandCoefficients(i);
+    if (restart) {
+      filters_left_[i].Reset();
+      filters_right_[i].Reset();
+    }
   }
+  params_.output_gain_db = params.output_gain_db;
+  params_.bypass = params.bypass;
 }
 
 void EqProcessor::UpdateBandCoefficients(size_t band_index) {
   const auto& band = params_.bands[band_index];
-  
+
+  // Keep the filter well-defined: RBJ designs need 0 < f < fs/2 and q > 0.
+  const double frequency = std::clamp(static_cast<double>(band.frequency_hz),
+                                      1.0, 0.49 * sample_rate_);
+  const double q = std::max(static_cast<double>(band.q), 0.01);
+  const double gain_db = band.gain_db;
+
+  BiquadFilter& left = filters_left_[band_index];
+  BiquadFilter& right = filters_right_[band_index];
+
   switch (band.type) {
     case FilterType::kHighCut:
-      filters_left_[band_index].SetHighCut(band.frequency_hz, band.q, sample_rate_);
-      filters_right_[band_index].SetHighCut(band.frequency_hz, band.q, sample_rate_);
+      left.SetHighCut(frequency, q, sample_rate_);
+      right.SetHighCut(frequency, q, sample_rate_);
       break;
-      
+
     case FilterType::kLowCut:
-      filters_left_[band_index].SetLowCut(band.frequency_hz, band.q, sample_rate_);
-      filters_right_[band_index].SetLowCut(band.frequency_hz, band.q, sample_rate_);
+      left.SetLowCut(frequency, q, sample_rate_);
+      right.SetLowCut(frequency, q, sample_rate_);
       break;
-      
+
     case FilterType::kLowShelf:
-      filters_left_[band_index].SetLowShelf(band.frequency_hz, band.gain_db, 
-                                            band.q, sample_rate_);
-      filters_right_[band_index].SetLowShelf(band.frequency_hz, band.gain_db,
-                                             band.q, sample_rate_);
+      left.SetLowShelf(frequency, gain_db, q, sample_rate_);
+      right.SetLowShelf(frequency, gain_db, q, sample_rate_);
       break;
-      
+
     case FilterType::kHighShelf:
-      filters_left_[band_index].SetHighShelf(band.frequency_hz, band.gain_db,
-                                             band.q, sample_rate_);
-      filters_right_[band_index].SetHighShelf(band.frequency_hz, band.gain_db,
-                                              band.q, sample_rate_);
+      left.SetHighShelf(frequency, gain_db, q, sample_rate_);
+      right.SetHighShelf(frequency, gain_db, q, sample_rate_);
       break;
-      
+
     case FilterType::kBell:
-      filters_left_[band_index].SetBell(band.frequency_hz, band.gain_db,
-                                        band.q, sample_rate_);
-      filters_right_[band_index].SetBell(band.frequency_hz, band.gain_db,
-                                         band.q, sample_rate_);
+    default:
+      left.SetBell(frequency, gain_db, q, sample_rate_);
+      right.SetBell(frequency, gain_db, q, sample_rate_);
       break;
   }
 }

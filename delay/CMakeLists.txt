@@ -92,6 +92,7 @@ if(BUILD_TESTS)
     # Test executable
     add_executable(DelayTests
         tests/test_clap_plugin.cc
+        tests/test_delay_processor.cc
     )
     
     target_include_directories(DelayTests
@@ -115,6 +116,26 @@ if(BUILD_TESTS)
     gtest_discover_tests(DelayTests)
 endif()
 
+# Benchmarks
+if(NOT DEFINED BUILD_BENCHMARKS)
+    option(BUILD_BENCHMARKS "Build throughput benchmarks" ON)
+endif()
+
+if(BUILD_BENCHMARKS)
+    add_executable(DelayBench
+        bench/bench_delay.cc
+        src/delay_processor.cc
+        src/delay_clap.cc
+    )
+
+    target_include_directories(DelayBench
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../bench
+            ${clap_SOURCE_DIR}/include
+    )
+endif()
+
 # Install plugin and TypeScript definitions
 install(TARGETS ${PROJECT_NAME}
     LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/plugins
@@ -133,5 +154,6 @@ message(STATUS "  ${PROJECT_NAME} Configuration")
 message(STATUS "═══════════════════════════════════════")
 message(STATUS "  Version:    ${PROJECT_VERSION}")
 message(STATUS "  Tests:      ${BUILD_TESTS}")
+message(STATUS "  Benchmarks: ${BUILD_BENCHMARKS}")
 message(STATUS "═══════════════════════════════════════")
 message(STATUS "")

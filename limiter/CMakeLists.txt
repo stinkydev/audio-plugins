@@ -43,13 +43,11 @@ endif()
 set(SOURCES
     src/limiter_processor.cc
     src/limiter_clap.cc
-    src/simd_utils.cc
 )
 
 set(HEADERS
     include/limiter_processor.h
     include/limiter_clap.h
-    include/simd_utils.h
 )
 
 # Create the CLAP plugin as a shared library
@@ -107,6 +105,7 @@ if(BUILD_TESTS)
     # Test executable
     add_executable(LimiterTests
         tests/test_clap_plugin.cc
+        tests/test_limiter_processor.cc
     )
     
     target_include_directories(LimiterTests
@@ -124,7 +123,6 @@ if(BUILD_TESTS)
     target_sources(LimiterTests PRIVATE
         src/limiter_processor.cc
         src/limiter_clap.cc
-        src/simd_utils.cc
     )
     
     # Copy test resources
@@ -136,6 +134,26 @@ if(BUILD_TESTS)
     
     include(GoogleTest)
     gtest_discover_tests(LimiterTests)
+endif()
+
+# Benchmarks
+if(NOT DEFINED BUILD_BENCHMARKS)
+    option(BUILD_BENCHMARKS "Build throughput benchmarks" ON)
+endif()
+
+if(BUILD_BENCHMARKS)
+    add_executable(LimiterBench
+        bench/bench_limiter.cc
+        src/limiter_processor.cc
+        src/limiter_clap.cc
+    )
+
+    target_include_directories(LimiterBench
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../bench
+            ${clap_SOURCE_DIR}/include
+    )
 endif()
 
 # Installation
@@ -158,5 +176,6 @@ message(STATUS "═════════════════════�
 message(STATUS "  Version:    ${PROJECT_VERSION}")
 message(STATUS "  SIMD:       ${ENABLE_SIMD}")
 message(STATUS "  Tests:      ${BUILD_TESTS}")
+message(STATUS "  Benchmarks: ${BUILD_BENCHMARKS}")
 message(STATUS "═══════════════════════════════════════")
 message(STATUS "")

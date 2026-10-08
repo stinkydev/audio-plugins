@@ -280,6 +280,11 @@ clap_process_status EqClap::Process(const clap_process_t* process) noexcept {
     ProcessParameterChanges(process->in_events);
   }
 
+  // Hand the current parameter values to the processor. This is the only
+  // place the processor's parameters change while active, so main-thread
+  // state loads and flushes only ever touch the atomics.
+  UpdateProcessorParams();
+
   const uint32_t frame_count = process->frames_count;
   const uint32_t input_count = process->audio_inputs_count;
   const uint32_t output_count = process->audio_outputs_count;
@@ -288,26 +293,31 @@ clap_process_status EqClap::Process(const clap_process_t* process) noexcept {
     return CLAP_PROCESS_SLEEP;
   }
 
-  const uint32_t in_channels = process->audio_inputs[0].channel_count;
-  const uint32_t out_channels = process->audio_outputs[0].channel_count;
-  
-  float* in_left = process->audio_inputs[0].data32[0];
-  float* in_right = (in_channels > 1) ? process->audio_inputs[0].data32[1] : nullptr;
-  float* out_left = process->audio_outputs[0].data32[0];
-  float* out_right = (out_channels > 1) ? process->audio_outputs[0].data32[1] : nullptr;
+  const clap_audio_buffer_t& in = process->audio_inputs[0];
+  const clap_audio_buffer_t& out = process->audio_outputs[0];
 
-  // Copy input to output
-  std::memcpy(out_left, in_left, frame_count * sizeof(float));
-  if (in_right && out_right) {
+  // The port does not advertise 64-bit support, so the host must give us
+  // 32-bit buffers. Refuse anything else rather than dereference null.
+  if (!in.data32 || !out.data32 || in.channel_count == 0 ||
+      out.channel_count == 0) {
+    return CLAP_PROCESS_ERROR;
+  }
+
+  float* in_left = in.data32[0];
+  float* in_right = (in.channel_count > 1) ? in.data32[1] : in_left;
+  float* out_left = out.data32[0];
+  float* out_right = (out.channel_count > 1) ? out.data32[1] : out_left;
+
+  if (out_left != in_left) {
+    std::memcpy(out_left, in_left, frame_count * sizeof(float));
+  }
+  if (out_right != out_left && out_right != in_right) {
     std::memcpy(out_right, in_right, frame_count * sizeof(float));
   }
 
-  // Process EQ
-  if (out_right) {
-    processor_.ProcessStereo(out_left, out_right, frame_count);
-  } else {
-    processor_.ProcessStereo(out_left, out_left, frame_count);
-  }
+  // In place. For a mono output both pointers alias the same buffer; the
+  // processor reads each frame before writing it.
+  processor_.ProcessStereo(out_left, out_right, frame_count);
 
   return CLAP_PROCESS_CONTINUE;
 }
@@ -535,10 +545,11 @@ bool EqClap::StateLoad(const clap_istream_t* stream) noexcept {
   if (read != sizeof(values)) return false;
 
   for (int i = 0; i < kParamIdCount; ++i) {
-    param_values_[i].store(values[i]);
+    SetParamValue(static_cast<clap_id>(i), values[i]);
   }
 
-  UpdateProcessorParams();
+  // The processor picks the new values up at the start of the next block
+  // (or on activate), so no processor access from this main-thread call.
   return true;
 }
 
@@ -555,8 +566,6 @@ void EqClap::ProcessParameterChanges(const clap_input_events_t* events) noexcept
       SetParamValue(param_event->param_id, param_event->value);
     }
   }
-
-  UpdateProcessorParams();
 }
 
 void EqClap::UpdateProcessorParams() noexcept {
@@ -565,8 +574,12 @@ void EqClap::UpdateProcessorParams() noexcept {
   // Update each band
   for (int i = 0; i < 4; ++i) {
     const int base_idx = i * 5;
-    params.bands[i].type = static_cast<FilterType>(
-        static_cast<int>(param_values_[base_idx + 0].load()));
+    // Enum values arrive as doubles; round and clamp so a modulated or slightly
+    // off value never selects a type that does not exist.
+    const long type_index = std::clamp(
+        std::lround(param_values_[base_idx + 0].load()), 0L,
+        static_cast<long>(FilterType::kHighCut));
+    params.bands[i].type = static_cast<FilterType>(type_index);
     params.bands[i].frequency_hz = static_cast<float>(NormalizedToFrequency(param_values_[base_idx + 1].load()));
     params.bands[i].gain_db = static_cast<float>(NormalizedToGain(param_values_[base_idx + 2].load()));
     params.bands[i].q = static_cast<float>(NormalizedToQ(param_values_[base_idx + 3].load()));
@@ -580,9 +593,12 @@ void EqClap::UpdateProcessorParams() noexcept {
 }
 
 void EqClap::SetParamValue(clap_id param_id, double value) noexcept {
-  if (param_id < kParamIdCount) {
-    param_values_[param_id].store(value);
-  }
+  if (param_id >= kParamIdCount) return;
+
+  // Band type parameters are integer enums 0..4; everything else is 0..1.
+  const bool is_type = (param_id < kParamIdOutputGain) && (param_id % 5 == 0);
+  const double max = is_type ? static_cast<double>(FilterType::kHighCut) : 1.0;
+  param_values_[param_id].store(std::clamp(value, 0.0, max));
 }
 
 uint32_t EqClap::AudioPortsCount(bool /*is_input*/) const noexcept {

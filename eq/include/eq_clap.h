@@ -115,7 +115,6 @@ class EqClap {
  private:
   void ProcessParameterChanges(const clap_input_events_t* events) noexcept;
   void UpdateProcessorParams() noexcept;
-  double ParamIdToValue(clap_id param_id) const noexcept;
   void SetParamValue(clap_id param_id, double value) noexcept;
 
   clap_plugin_t plugin_;

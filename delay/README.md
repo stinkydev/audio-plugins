@@ -4,18 +4,21 @@ A simple stereo delay CLAP plugin.
 
 ## Features
 
-- **Delay Time**: 0 to 2000 milliseconds
+- **Delay Time**: 0 to 1000 milliseconds, rounded to the nearest sample.
+  0 ms is a true zero-sample delay.
 - **Mix**: Dry/wet control (0-100%)
 - Stereo processing with synchronized left and right channels
+- No latency is reported to the host, so it can be used as an alignment
+  (lip-sync) delay without the host compensating it away
 
 ## Parameters
 
 All parameters use normalized 0..1 values internally:
 
-- **Delay Time**: Linear mapping (0-2000 ms)
+- **Delay Time**: Linear mapping (0-1000 ms)
   - `0.0` = 0 ms (default)
-  - `0.25` = 500 ms
-  - `1.0` = 2000 ms
+  - `0.5` = 500 ms
+  - `1.0` = 1000 ms
 
 - **Mix**: Linear mapping (0-100%)
   - `0.0` = 100% dry

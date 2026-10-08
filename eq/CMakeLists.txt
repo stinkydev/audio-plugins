@@ -133,6 +133,26 @@ if(BUILD_TESTS)
     gtest_discover_tests(EqTests)
 endif()
 
+# Benchmarks
+if(NOT DEFINED BUILD_BENCHMARKS)
+    option(BUILD_BENCHMARKS "Build throughput benchmarks" ON)
+endif()
+
+if(BUILD_BENCHMARKS)
+    add_executable(EqBench
+        bench/bench_eq.cc
+        src/eq_processor.cc
+        src/eq_clap.cc
+    )
+
+    target_include_directories(EqBench
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../bench
+            ${clap_SOURCE_DIR}/include
+    )
+endif()
+
 # Install plugin and TypeScript definitions
 install(TARGETS ${PROJECT_NAME}
     LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/plugins

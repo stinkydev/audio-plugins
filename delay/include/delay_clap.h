@@ -24,7 +24,7 @@ namespace stinky_delay {
 
 // Parameter ranges (actual units)
 constexpr double kDelayTimeMin = 0.0;
-constexpr double kDelayTimeMax = 1000.0;
+constexpr double kDelayTimeMax = kMaxDelayMs;
 constexpr double kMixMin = 0.0;
 constexpr double kMixMax = 1.0;
 
@@ -74,7 +74,6 @@ class DelayClap {
  private:
   void ProcessParameterChanges(const clap_input_events_t* events) noexcept;
   void UpdateProcessorParams() noexcept;
-  double ParamIdToValue(clap_id param_id) const noexcept;
   void SetParamValue(clap_id param_id, double value) noexcept;
 
   clap_plugin_t plugin_;

@@ -5,10 +5,10 @@ A collection of high-quality CLAP audio plugins built with modern C++20.
 ## Plugins
 
 ### 🎚️ Stinky Compressor
-High-performance dynamics compressor with SIMD optimizations.
-- Threshold, ratio, attack, release controls
-- Soft knee compression
-- Auto makeup gain
+Feed-forward dynamics compressor for ambience and commentary buses.
+- Threshold, ratio, attack, release and quadratic soft knee
+- Detector hold keeps low-frequency content free of distortion
+- Linked stereo with external sidechain, predictable auto makeup
 - [Learn more](compressor/README.md)
 
 ### 🎛️ Stinky EQ
@@ -19,9 +19,10 @@ High-performance dynamics compressor with SIMD optimizations.
 - [Learn more](eq/README.md)
 
 ### 🔊 Stinky Limiter
-Transparent brick-wall limiter for mastering and final stage processing.
-- Independent threshold and output level controls
-- Fast attack and release for transparent limiting
+True-peak brick-wall limiter for live production and broadcast delivery.
+- Guaranteed ceiling with 5 ms lookahead and BS.1770 true-peak detection
+- Dual-stage release that stays stable on sustained material such as crowd noise
+- Reports its latency to the host
 - [Learn more](limiter/README.md)
 
 ### 🔁 Stinky Delay
@@ -69,7 +70,10 @@ cmake .. -DBUILD_COMPRESSOR=ON -DBUILD_EQ=OFF -DBUILD_LIMITER=OFF -DBUILD_DELAY=
 # Disable tests
 cmake .. -DBUILD_TESTS=OFF
 
-# Disable SIMD optimizations (compressor only)
+# Disable benchmarks
+cmake .. -DBUILD_BENCHMARKS=OFF
+
+# Disable SIMD optimizations (compressor and limiter)
 cmake .. -DENABLE_SIMD=OFF
 
 # Combine options
@@ -116,13 +120,15 @@ audio-plugins/
 ├── CMakeLists.txt          # Root build configuration
 ├── README.md               # This file
 ├── plugins.ts              # Central TypeScript exports
+├── bench/                  # Shared benchmark support header
 ├── compressor/             # Compressor plugin
 │   ├── CMakeLists.txt
 │   ├── README.md
 │   ├── compressor-plugin.ts
 │   ├── include/
 │   ├── src/
-│   └── tests/
+│   ├── tests/
+│   └── bench/
 ├── eq/                     # EQ plugin
 │   ├── CMakeLists.txt
 │   ├── README.md
@@ -130,6 +136,7 @@ audio-plugins/
 │   ├── include/
 │   ├── src/
 │   ├── tests/
+│   ├── bench/
 │   └── web-ui/            # Web-based EQ editor
 ├── limiter/                # Limiter plugin
 │   ├── CMakeLists.txt
@@ -137,14 +144,16 @@ audio-plugins/
 │   ├── limiter-plugin.ts
 │   ├── include/
 │   ├── src/
-│   └── tests/
+│   ├── tests/
+│   └── bench/
 └── delay/                  # Delay plugin
     ├── CMakeLists.txt
     ├── README.md
     ├── delay-plugin.ts
     ├── include/
     ├── src/
-    └── tests/
+    ├── tests/
+    └── bench/
 ```
 
 ## Development
@@ -174,6 +183,26 @@ ctest -C Release -R Eq
 ctest -C Release -R Limiter
 ctest -C Release -R Delay
 ```
+
+### Running Benchmarks
+
+Each plugin has a `<Plugin>Bench` executable that times its DSP core and its
+CLAP `Process()` call over a fixed length of audio and reports nanoseconds per
+frame plus the share of one core that costs at the stated sample rate. Build in
+Release; Debug numbers are meaningless.
+
+```powershell
+# Build and run every benchmark
+cd build
+cmake --build . --config Release --target bench
+
+# Run one directly, optionally with the audio length in seconds and run count
+.\limiter\Release\LimiterBench.exe 30 5
+```
+
+Compare the `ns/frame` column against an earlier run on the same machine to
+catch regressions. Each figure is the best of several runs, so a few percent
+of noise between runs is normal.
 
 ## Technical Details
 

@@ -1,24 +1,42 @@
 # Stinky Compressor
 
-A high-performance audio compressor CLAP plugin with SIMD optimizations.
+A feed-forward compressor CLAP plugin for live production, built for ambience
+and commentary buses in sports broadcast.
 
 ## Features
 
-- **Cross-platform**: Windows, macOS, and Linux support
-- **C++20**: Modern C++ with Google code style
-- **SIMD Optimized**: AVX2 instructions with automatic scalar fallback
-- **CLAP**: Modern, open-source plugin format
-- **No GUI**: Lightweight, host-controlled parameters
-- **No SDK required**: CLAP headers fetched automatically via CMake
+- **Clean on low frequencies**: the detector holds its gain for 15 ms before
+  releasing, so it never chases the half-cycles of crowd rumble or PA bass. No
+  measurable distortion on a 50 Hz tone at 14 dB over threshold.
+- **Correct soft knee**: quadratic knee that is continuous at both edges and
+  never boosts below threshold.
+- **Linked stereo detection** with optional external sidechain.
+- **Predictable auto makeup**: a fixed function of threshold, ratio and knee.
+  No adaptive gain, no level creep, no jump when switched on.
+- **Click-free parameter changes**: makeup gain moves are smoothed over 10 ms.
+- **Cross-platform**: Windows, macOS, and Linux
+- **CLAP**: open-source plugin format, headers fetched automatically via CMake
 
 ## Parameters
 
 - **Threshold** (-60 to 0 dB): Level above which compression is applied
-- **Ratio** (1:1 to 20:1): Amount of compression
-- **Attack** (0.1 to 100 ms): How quickly compression responds
-- **Release** (10 to 1000 ms): How quickly compression releases
+- **Ratio** (1:1 to 100:1): Amount of compression
+- **Attack** (0.05 to 250 ms): How quickly gain reduction builds up
+- **Release** (10 to 2500 ms): How quickly gain reduction recovers, after a
+  fixed 15 ms hold
 - **Knee** (0 to 12 dB): Soft knee width (0 = hard knee)
 - **Makeup Gain** (-12 to +24 dB): Output level compensation
+- **Auto Makeup** (on/off): Replaces Makeup Gain with half the gain reduction a
+  full-scale steady signal would receive, so a mix that peaks near full scale
+  comes out at roughly the same level
+
+### Starting points
+
+- **Commentary**: threshold around -24 dB, ratio 3:1, attack 5 ms, release
+  120 ms, knee 6 dB. Enough to even out a commentator without pumping.
+- **Ambience**: threshold set so the crowd's normal level sits just under it,
+  ratio 2:1 to 3:1, attack 20 ms, release 300 to 500 ms, knee 12 dB. Slow
+  release keeps a roar from breathing.
 
 ## Building
 
@@ -73,6 +91,7 @@ Copy the built plugin to your CLAP plugin directory:
 include/
 ├── compressor_processor.h  # Core DSP algorithm
 ├── compressor_clap.h       # CLAP wrapper interface
+├── fast_math.h             # log2 / exp2 approximations, scalar and AVX2
 └── simd_utils.h            # SIMD operations
 
 src/
@@ -85,21 +104,37 @@ src/
 
 ### Compression Algorithm
 
-- Peak detection with stereo linking
-- Logarithmic domain processing for accuracy
-- Smooth envelope follower (attack/release)
-- Soft knee capability
-- Makeup gain compensation
+Feed-forward topology after Giannoulis, Massberg & Reiss (2012), with the
+level detector placed after the gain computer in the dB domain:
 
-### SIMD Implementation
+1. Linked peak level of the sidechain (or main input) is converted to dB.
+2. The static curve computes the gain reduction for that level, using a
+   quadratic soft knee.
+3. The gain reduction is smoothed in dB. It attacks with the attack time
+   whenever the target is at or above the current value. When the target
+   falls below, the current value is held for 15 ms, then released with the
+   release time. The hold is what keeps low-frequency content from
+   modulating the gain within a cycle.
+4. Makeup gain (manual or auto) is smoothed over 10 ms and applied together
+   with the gain reduction.
 
-- Runtime CPU feature detection
-- AVX2 vectorization for 8x float operations
-- Automatic fallback to scalar code
-- Operations vectorized:
-  - Gain application
-  - Multiply-add operations
-  - Min/max operations
+The gain reduction meter reports the deepest reduction reached in the most
+recent block.
+
+### SIMD
+
+Each block is processed in three passes over 64-frame chunks. The gain
+computer (peak, level in dB, static curve) and the gain stage (dB to linear,
+makeup, apply) depend only on their own sample and run eight frames at a time
+with AVX2 when `ENABLE_SIMD` is on. The envelope between them is recursive
+and stays scalar. The dB conversions use the log2 / exp2 approximations in
+`fast_math.h`, accurate to about 1e-6 dB, instead of `log10` and `pow`. With
+`ENABLE_SIMD` off, scalar code performs the same operations in the same order,
+so the two builds differ only by fused-multiply-add rounding. The result does
+not depend on the chunk size.
+
+`simd_utils` provides older AVX2 buffer helpers with a scalar fallback. They
+are built and tested but not used by the compressor.
 
 ### Code Style
 

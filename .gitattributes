@@ -1,0 +1,7 @@
+# Line endings: LF in the repository and in every checkout, regardless of the
+# local core.autocrlf setting. Keep in sync with .editorconfig.
+* text=auto eol=lf
+
+# Windows batch files are the one thing that must stay CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
