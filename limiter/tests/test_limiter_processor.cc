@@ -331,6 +331,59 @@ TEST_P(LimiterProcessorTest, ReleaseSettlesExactlyAtUnity) {
   EXPECT_FLOAT_EQ(MaxAbs(ql), 0.5f);
 }
 
+TEST_P(LimiterProcessorTest, ThresholdDropDuringAudioIsContinuousAndClean) {
+  // Lowering the threshold with the output level fixed raises the output
+  // scaling at once. The gains already in the pipeline were computed for the
+  // old ceiling, so unless they are rebased the hard clip flattens the output
+  // for a whole lookahead window. A 0.5 sine is untouched at -1 dB and 14 dB
+  // over at -20 dB.
+  const double freq = 1000.0;
+  const size_t n = static_cast<size_t>(0.5 * sample_rate_);
+  auto fill = [&](std::vector<float>& l, std::vector<float>& r, size_t from) {
+    for (size_t i = 0; i < l.size(); ++i) {
+      l[i] = r[i] = 0.5f * static_cast<float>(
+                        std::sin(2.0 * kPi * freq * (from + i) / sample_rate_));
+    }
+  };
+  std::vector<float> l1(n), r1(n);
+  fill(l1, r1, 0);
+  ProcessInBlocks(processor_, l1, r1);
+  EXPECT_NEAR(MaxAbs(l1, n / 2), 0.5f, 1e-3f);
+
+  LimiterParams params;
+  params.threshold_db = -20.0f;
+  params.output_level_db = -1.0f;
+  processor_.SetParams(params);
+
+  std::vector<float> l2(n), r2(n);
+  fill(l2, r2, n);
+  ProcessInBlocks(processor_, l2, r2);
+
+  // Never above the output ceiling
+  EXPECT_LE(MaxAbs(l2), ceiling_ + 1e-6f);
+
+  // Continuous across the change: nothing in the output may move faster than
+  // the sine itself does at the ceiling, with room for the gain ramp.
+  const float max_slew =
+      2.0f * ceiling_ * static_cast<float>(2.0 * kPi * freq / sample_rate_);
+  const size_t window = static_cast<size_t>(0.02 * sample_rate_);
+  EXPECT_LE(std::abs(l2[0] - l1[n - 1]), max_slew);
+  for (size_t i = 1; i < window; ++i) {
+    EXPECT_LE(std::abs(l2[i] - l2[i - 1]), max_slew) << "sample " << i;
+  }
+
+  // No flat tops: at most a couple of consecutive samples at the ceiling.
+  size_t run = 0, longest = 0;
+  for (size_t i = 0; i < static_cast<size_t>(0.05 * sample_rate_); ++i) {
+    run = (std::abs(l2[i]) >= ceiling_ - 1e-6f) ? run + 1 : 0;
+    longest = std::max(longest, run);
+  }
+  EXPECT_LE(longest, 2u);
+
+  // ... and it is limiting by the end of the block
+  EXPECT_LT(processor_.GetGainReduction(), -10.0f);
+}
+
 TEST_P(LimiterProcessorTest, ResetClearsState) {
   std::vector<float> l(4096, 2.0f), r(4096, 2.0f);
   ProcessInBlocks(processor_, l, r);

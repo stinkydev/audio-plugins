@@ -92,6 +92,10 @@ class LimiterProcessor {
   void BeginBlock();
   void EndBlock();
 
+  // Scales every stored gain by ratio (new ceiling / old ceiling) so audio
+  // already in the pipeline leaves at the level it would have anyway.
+  void RebaseGainState(float ratio);
+
   LimiterParams params_;
   double sample_rate_;
 

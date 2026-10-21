@@ -196,15 +196,39 @@ void LimiterProcessor::Initialize(double sample_rate) {
 
   box_.assign(lookahead_samples_, 1.0f);
 
-  Reset();
   SetParams(params_);
+  Reset();
 }
 
 void LimiterProcessor::SetParams(const LimiterParams& params) {
   params_ = params;
+  const float old_ceiling = ceiling_lin_;
   ceiling_lin_ = DbToLinear(std::max(params_.threshold_db, kMinDb));
   output_gain_ = DbToLinear(params_.output_level_db - params_.threshold_db);
   output_ceiling_ = ceiling_lin_ * output_gain_;
+  if (ceiling_lin_ != old_ceiling) RebaseGainState(ceiling_lin_ / old_ceiling);
+}
+
+// Every stored gain is ceiling / peak for some input frame. When the ceiling
+// changes, scale them so they describe the same frames against the new
+// ceiling: the stored gain scales by new / old and the output scaling by
+// old / new, so audio already in the pipeline leaves exactly as it would
+// have. Without this, lowering the threshold raises the output scaling at
+// once while the pipeline still holds gains for the old ceiling, and the
+// hard clip catches the difference for a whole lookahead window. Gains of
+// 1.0 are scaled too, since their frames may have sat anywhere up to the old
+// ceiling; such material then settles to its new level over the release.
+void LimiterProcessor::RebaseGainState(float ratio) {
+  const double r = ratio;
+  fast_env_ = std::min(fast_env_ * r, 1.0);
+  slow_env_ = std::min(slow_env_ * r, 1.0);
+  for (float& v : min_values_) v = std::min(v * ratio, 1.0f);
+  double sum = 0.0;
+  for (float& v : box_) {
+    v = std::min(v * ratio, 1.0f);
+    sum += static_cast<double>(v);
+  }
+  box_sum_ = sum;
 }
 
 void LimiterProcessor::Reset() {

@@ -147,6 +147,13 @@ contains the detector frame for the sample being output, the applied gain is
 always at or below the gain that sample required. That is the brickwall
 guarantee, and it is exact for sample peaks.
 
+Changing the threshold rescales the gains already in the pipeline by the
+ratio of the new ceiling to the old one, while the output scaling changes by
+the inverse, so audio in flight leaves at the level it would have anyway:
+no step, and nothing for the hard clip to catch. Material that needed no
+limiting before the change then settles to its new level over the release
+time.
+
 ### The ceiling contract
 
 The true-peak ceiling is a bound, not a mathematical guarantee, for two
