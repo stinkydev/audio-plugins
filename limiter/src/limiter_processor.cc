@@ -1,224 +1,445 @@
 // Copyright 2025
-// Fast Audio Limiter - DSP Processing Implementation
+// Stinky Limiter - DSP Processing Implementation
+//
+// Signal flow per frame (both channels linked):
+//
+//   input ──┬─► delay line (latency L) ──────────────────────────► × gain ─► clip ─► out
+//           │
+//           └─► true-peak detect ─► target gain g = min(1, ceiling / peak)
+//                                    │
+//                                    ├─► fast envelope (instant attack, fast release)
+//                                    └─► slow envelope (slow attack, slow release)
+//                                            │
+//                                    r = min(fast, slow)            (r <= g always)
+//                                            │
+//                                    sliding minimum over W samples (hold)
+//                                            │
+//                                    moving average over W samples  (linear ramp)
+//                                            │
+//                                          gain
+//
+// Why this never exceeds the ceiling: the smoothed gain at output time n is the
+// average of W sliding minima whose windows all contain detector time n-W+1, so
+// gain[n] <= r[n-W+1] <= g[n-W+1]. The audio sample emitted at time n is the
+// one the detector saw at time n-W+1, so |out| <= |x| * ceiling / peak <= ceiling.
 
 #include "limiter_processor.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 
-#include "simd_utils.h"
+// The true-peak detector has an AVX2 path (one 8-lane fused multiply-add per
+// tap) and a portable path. ENABLE_SIMD in CMake defines USE_SIMD and sets the
+// AVX2 code-generation flags; MSVC implies FMA with /arch:AVX2.
+#if defined(USE_SIMD) && defined(__AVX2__) && \
+    (defined(__FMA__) || defined(_MSC_VER))
+#include <immintrin.h>
+#define LIMITER_DETECTOR_AVX2 1
+#else
+#define LIMITER_DETECTOR_AVX2 0
+#endif
 
 namespace fast_limiter {
 
 namespace {
 
+// Timing constants (fixed by design; see README for rationale)
+constexpr float kLookaheadMs = 5.0f;
+constexpr float kFastReleaseMs = 80.0f;   // isolated transients
+constexpr float kSlowAttackMs = 200.0f;   // how quickly sustained limiting is recognised
+constexpr float kSlowReleaseMs = 500.0f;  // recovery after sustained limiting
+
 constexpr float kMinDb = -96.0f;
 constexpr float kEpsilon = 1e-8f;
-constexpr size_t kMaxDelayBufferSize = 48000;  // 1 second at 48kHz
 
-inline float DbToLinear(float db) {
-  return std::pow(10.0f, db / 20.0f);
+// ITU-R BS.1770-4 Annex 2 true-peak interpolation filter: a 48-tap FIR at 4x
+// rate expressed as four 12-tap polyphase branches. Applied as
+// sum_k c[phase][k] * x[n - k]. The main lobe sits between x[n-6] and x[n-5],
+// so the estimate is aligned to input time n-6 (kTruePeakDelay).
+constexpr size_t kTruePeakTaps = 12;
+constexpr size_t kTruePeakPhases = 4;
+constexpr size_t kTruePeakDelay = 6;
+constexpr float kTruePeakCoeffs[kTruePeakPhases][kTruePeakTaps] = {
+    {0.0017089843750f, 0.0109863281250f, -0.0196533203125f, 0.0332031250000f,
+     -0.0594482421875f, 0.1373291015625f, 0.9721679687500f, -0.1022949218750f,
+     0.0476074218750f, -0.0266113281250f, 0.0148925781250f, -0.0083007812500f},
+    {-0.0291748046875f, 0.0292968750000f, -0.0517578125000f, 0.0891113281250f,
+     -0.1665039062500f, 0.4650878906250f, 0.7797851562500f, -0.2003173828125f,
+     0.1015625000000f, -0.0582275390625f, 0.0330810546875f, -0.0189208984375f},
+    {-0.0189208984375f, 0.0330810546875f, -0.0582275390625f, 0.1015625000000f,
+     -0.2003173828125f, 0.7797851562500f, 0.4650878906250f, -0.1665039062500f,
+     0.0891113281250f, -0.0517578125000f, 0.0292968750000f, -0.0291748046875f},
+    {-0.0083007812500f, 0.0148925781250f, -0.0266113281250f, 0.0476074218750f,
+     -0.1022949218750f, 0.9721679687500f, 0.1373291015625f, -0.0594482421875f,
+     0.0332031250000f, -0.0196533203125f, 0.0109863281250f, 0.0017089843750f},
+};
+
+// Detector lane layout: phases 0-3 of the left channel in lanes 0-3, the same
+// phases of the right channel in lanes 4-7.
+constexpr size_t kDetectorLanes = 2 * kTruePeakPhases;
+
+// The same table tap-major and duplicated into both channel halves, so the
+// detector walks the taps once and updates every lane side by side (see
+// DetectPeak). 32-byte aligned for the AVX2 loads.
+struct alignas(32) TapCoeffs {
+  float c[kDetectorLanes];
+};
+constexpr std::array<TapCoeffs, kTruePeakTaps> BuildDetectorCoeffs() {
+  std::array<TapCoeffs, kTruePeakTaps> by_tap{};
+  for (size_t k = 0; k < kTruePeakTaps; ++k) {
+    for (size_t p = 0; p < kTruePeakPhases; ++p) {
+      by_tap[k].c[p] = kTruePeakCoeffs[p][k];
+      by_tap[k].c[kTruePeakPhases + p] = kTruePeakCoeffs[p][k];
+    }
+  }
+  return by_tap;
 }
+constexpr std::array<TapCoeffs, kTruePeakTaps> kDetectorCoeffs =
+    BuildDetectorCoeffs();
+static_assert(kTruePeakTaps % 2 == 0,
+              "the detector sums even and odd taps in two interleaved chains");
+
+#if LIMITER_DETECTOR_AVX2
+// One input sample pair spread over the detector lanes: [l l l l r r r r].
+inline __m256 ChannelPair(const float* left, const float* right) {
+  return _mm256_insertf128_ps(_mm256_castps128_ps256(_mm_broadcast_ss(left)),
+                              _mm_broadcast_ss(right), 1);
+}
+#endif
+
+inline float DbToLinear(float db) { return std::pow(10.0f, db / 20.0f); }
 
 inline float LinearToDb(float linear) {
-  return 20.0f * ::log10f(std::max(linear, kEpsilon));
+  return 20.0f * std::log10(std::max(linear, kEpsilon));
+}
+
+// Per-sample step fraction for a one-pole smoother with the given time constant.
+inline float StepFraction(float time_ms, double sample_rate) {
+  const float samples = time_ms * 0.001f * static_cast<float>(sample_rate);
+  if (samples <= 1.0f) return 1.0f;
+  return 1.0f - std::exp(-1.0f / samples);
+}
+
+inline size_t NextPowerOfTwo(size_t n) {
+  size_t p = 1;
+  while (p < n) p <<= 1;
+  return p;
 }
 
 }  // namespace
 
 LimiterProcessor::LimiterProcessor()
     : sample_rate_(44100.0),
-      envelope_gain_(1.0f),
-      gain_reduction_db_(0.0f),
-      attack_coeff_(0.0f),
-      release_coeff_(0.0f),
-      delay_buffer_left_(nullptr),
-      delay_buffer_right_(nullptr),
-      delay_buffer_size_(0),
-      delay_write_pos_(0),
-      delay_read_pos_(0),
-      avg_reduction_db_(0.0f),
-      alpha_avg_(0.0f) {
-  // Allocate maximum delay buffer
-  delay_buffer_left_ = new float[kMaxDelayBufferSize];
-  delay_buffer_right_ = new float[kMaxDelayBufferSize];
-  std::memset(delay_buffer_left_, 0, kMaxDelayBufferSize * sizeof(float));
-  std::memset(delay_buffer_right_, 0, kMaxDelayBufferSize * sizeof(float));
-}
-
-LimiterProcessor::~LimiterProcessor() {
-  delete[] delay_buffer_left_;
-  delete[] delay_buffer_right_;
+      ceiling_lin_(1.0f),
+      output_gain_(1.0f),
+      output_ceiling_(1.0f),
+      oversampling_(1),
+      detector_delay_(0),
+      lookahead_samples_(1),
+      latency_samples_(0),
+      fast_release_k_(1.0f),
+      slow_attack_k_(1.0f),
+      slow_release_k_(1.0f),
+      history_pos_(0),
+      delay_mask_(0),
+      delay_pos_(0),
+      fast_env_(1.0),
+      slow_env_(1.0),
+      min_mask_(0),
+      min_head_(0),
+      min_tail_(0),
+      sample_index_(0),
+      box_pos_(0),
+      box_sum_(0.0),
+      box_refresh_counter_(0),
+      block_min_gain_(1.0f),
+      gain_reduction_db_(0.0f) {
+  Initialize(sample_rate_);
 }
 
 void LimiterProcessor::Initialize(double sample_rate) {
+  if (sample_rate <= 0.0) sample_rate = 44100.0;
   sample_rate_ = sample_rate;
-  Reset();
-  
-  // Calculate averaging filter coefficient for 2 second time constant
-  alpha_avg_ = std::exp(-1.0f / (static_cast<float>(sample_rate) * 2.0f));
-  
-  // Recalculate coefficients
+
+  // True-peak oversampling per BS.1770: 4x up to 48 kHz family, 2x for 88.2/96,
+  // none above (inter-sample overs are negligible at 176.4 kHz and up).
+  if (sample_rate < 64000.0) {
+    oversampling_ = 4;
+  } else if (sample_rate < 128000.0) {
+    oversampling_ = 2;
+  } else {
+    oversampling_ = 1;
+  }
+  detector_delay_ = (oversampling_ > 1) ? kTruePeakDelay : 0;
+
+  lookahead_samples_ = static_cast<size_t>(
+      std::lround(kLookaheadMs * 0.001 * sample_rate));
+  lookahead_samples_ = std::max<size_t>(lookahead_samples_, 1);
+  latency_samples_ = detector_delay_ + lookahead_samples_ - 1;
+
+  fast_release_k_ = StepFraction(kFastReleaseMs, sample_rate);
+  slow_attack_k_ = StepFraction(kSlowAttackMs, sample_rate);
+  slow_release_k_ = StepFraction(kSlowReleaseMs, sample_rate);
+
+  // Buffers
+  const size_t delay_size = NextPowerOfTwo(latency_samples_ + 1);
+  delay_left_.assign(delay_size, 0.0f);
+  delay_right_.assign(delay_size, 0.0f);
+  delay_mask_ = delay_size - 1;
+
+  const size_t min_size = NextPowerOfTwo(lookahead_samples_ + 1);
+  min_values_.assign(min_size, 1.0f);
+  min_indices_.assign(min_size, 0);
+  min_mask_ = min_size - 1;
+
+  box_.assign(lookahead_samples_, 1.0f);
+
   SetParams(params_);
+  Reset();
 }
 
 void LimiterProcessor::SetParams(const LimiterParams& params) {
   params_ = params;
-  
-  // Brickwall limiter: instant attack (0.1ms) and fast release (50ms)
-  constexpr float kAttackMs = 0.1f;
-  constexpr float kReleaseMs = 50.0f;
-  
-  attack_coeff_ = std::exp(-1.0f / (kAttackMs * 0.001f * 
-                                     static_cast<float>(sample_rate_)));
-  release_coeff_ = std::exp(-1.0f / (kReleaseMs * 0.001f * 
-                                      static_cast<float>(sample_rate_)));
-  
-  // Fixed 5ms lookahead for brickwall limiting
-  constexpr float kLookaheadMs = 5.0f;
-  size_t new_delay_size = static_cast<size_t>(
-      kLookaheadMs * 0.001f * static_cast<float>(sample_rate_));
-  new_delay_size = std::min(new_delay_size, kMaxDelayBufferSize - 1);
-  
-  if (new_delay_size != delay_buffer_size_) {
-    delay_buffer_size_ = new_delay_size;
-    // Reset positions when size changes
-    delay_write_pos_ = 0;
-    delay_read_pos_ = 0;
-    std::memset(delay_buffer_left_, 0, kMaxDelayBufferSize * sizeof(float));
-    std::memset(delay_buffer_right_, 0, kMaxDelayBufferSize * sizeof(float));
+  const float old_ceiling = ceiling_lin_;
+  ceiling_lin_ = DbToLinear(std::max(params_.threshold_db, kMinDb));
+  output_gain_ = DbToLinear(params_.output_level_db - params_.threshold_db);
+  output_ceiling_ = ceiling_lin_ * output_gain_;
+  if (ceiling_lin_ != old_ceiling) RebaseGainState(ceiling_lin_ / old_ceiling);
+}
+
+// Every stored gain is ceiling / peak for some input frame. When the ceiling
+// changes, scale them so they describe the same frames against the new
+// ceiling: the stored gain scales by new / old and the output scaling by
+// old / new, so audio already in the pipeline leaves exactly as it would
+// have. Without this, lowering the threshold raises the output scaling at
+// once while the pipeline still holds gains for the old ceiling, and the
+// hard clip catches the difference for a whole lookahead window. Gains of
+// 1.0 are scaled too, since their frames may have sat anywhere up to the old
+// ceiling; such material then settles to its new level over the release.
+void LimiterProcessor::RebaseGainState(float ratio) {
+  const double r = ratio;
+  fast_env_ = std::min(fast_env_ * r, 1.0);
+  slow_env_ = std::min(slow_env_ * r, 1.0);
+  for (float& v : min_values_) v = std::min(v * ratio, 1.0f);
+  double sum = 0.0;
+  for (float& v : box_) {
+    v = std::min(v * ratio, 1.0f);
+    sum += static_cast<double>(v);
   }
+  box_sum_ = sum;
 }
 
 void LimiterProcessor::Reset() {
-  envelope_gain_ = 1.0f;
+  std::fill(std::begin(history_left_), std::end(history_left_), 0.0f);
+  std::fill(std::begin(history_right_), std::end(history_right_), 0.0f);
+  history_pos_ = 0;
+
+  std::fill(delay_left_.begin(), delay_left_.end(), 0.0f);
+  std::fill(delay_right_.begin(), delay_right_.end(), 0.0f);
+  delay_pos_ = 0;
+
+  fast_env_ = 1.0;
+  slow_env_ = 1.0;
+
+  min_head_ = 0;
+  min_tail_ = 0;
+  sample_index_ = 0;
+
+  std::fill(box_.begin(), box_.end(), 1.0f);
+  box_pos_ = 0;
+  box_sum_ = static_cast<double>(box_.size());
+  box_refresh_counter_ = 0;
+
+  block_min_gain_ = 1.0f;
   gain_reduction_db_ = 0.0f;
-  avg_reduction_db_ = 0.0f;
-  delay_write_pos_ = 0;
-  delay_read_pos_ = 0;
-  if (delay_buffer_left_ && delay_buffer_right_) {
-    std::memset(delay_buffer_left_, 0, kMaxDelayBufferSize * sizeof(float));
-    std::memset(delay_buffer_right_, 0, kMaxDelayBufferSize * sizeof(float));
+}
+
+float LimiterProcessor::DetectPeak() const {
+  // The raw sample at the detector's alignment point is always included, which
+  // is what makes the sample-peak guarantee exact regardless of the filter.
+  const size_t aligned = (history_pos_ - detector_delay_) & kHistoryMask;
+  float peak = std::max(std::abs(history_left_[aligned]),
+                        std::abs(history_right_[aligned]));
+
+  if (oversampling_ == 1) return peak;
+
+  // All four phases of both channels are summed side by side, one tap at a
+  // time: eight independent accumulators updated elementwise, as two
+  // interleaved chains (even taps, odd taps) that are added at the end. The
+  // obvious form (one dot product per phase) is a serial chain of twelve
+  // dependent multiply-adds per phase and is several times slower. The two
+  // paths add in the same order and differ only in the rounding of the fused
+  // multiply-add.
+  alignas(32) float acc[kDetectorLanes] = {};
+#if LIMITER_DETECTOR_AVX2
+  __m256 even = _mm256_setzero_ps();
+  __m256 odd = _mm256_setzero_ps();
+  for (size_t k = 0; k < kTruePeakTaps; k += 2) {
+    const size_t idx0 = (history_pos_ - k) & kHistoryMask;
+    const size_t idx1 = (history_pos_ - k - 1) & kHistoryMask;
+    even = _mm256_fmadd_ps(_mm256_load_ps(kDetectorCoeffs[k].c),
+                           ChannelPair(&history_left_[idx0],
+                                       &history_right_[idx0]),
+                           even);
+    odd = _mm256_fmadd_ps(_mm256_load_ps(kDetectorCoeffs[k + 1].c),
+                          ChannelPair(&history_left_[idx1],
+                                      &history_right_[idx1]),
+                          odd);
   }
-}
-
-float LimiterProcessor::CalculateGainReduction(float input_level_db) const {
-  // Limiter uses infinite ratio - anything above threshold is reduced to threshold
-  if (input_level_db > params_.threshold_db) {
-    // Gain reduction needed (this will be negative or zero)
-    return params_.threshold_db - input_level_db;
+  _mm256_store_ps(acc, _mm256_add_ps(even, odd));
+#else
+  float even[kDetectorLanes] = {};
+  float odd[kDetectorLanes] = {};
+  for (size_t k = 0; k < kTruePeakTaps; k += 2) {
+    const size_t idx0 = (history_pos_ - k) & kHistoryMask;
+    const size_t idx1 = (history_pos_ - k - 1) & kHistoryMask;
+    const float* c0 = kDetectorCoeffs[k].c;
+    const float* c1 = kDetectorCoeffs[k + 1].c;
+    for (size_t p = 0; p < kTruePeakPhases; ++p) {
+      even[p] += c0[p] * history_left_[idx0];
+      even[kTruePeakPhases + p] +=
+          c0[kTruePeakPhases + p] * history_right_[idx0];
+      odd[p] += c1[p] * history_left_[idx1];
+      odd[kTruePeakPhases + p] +=
+          c1[kTruePeakPhases + p] * history_right_[idx1];
+    }
   }
-  return 0.0f;  // No reduction needed
-}
+  for (size_t i = 0; i < kDetectorLanes; ++i) acc[i] = even[i] + odd[i];
+#endif
 
-float LimiterProcessor::ApplyEnvelope(float target_gain, float current_gain) {
-  // Use attack when gain needs to decrease (limiting action)
-  // Use release when gain recovers
-  const float coeff = (target_gain < current_gain) ? 
-                      attack_coeff_ : release_coeff_;
-  return coeff * current_gain + (1.0f - coeff) * target_gain;
-}
-
-void LimiterProcessor::UpdateDelayBuffer(float left_sample, float right_sample) {
-  if (delay_buffer_size_ == 0) return;
-  
-  delay_buffer_left_[delay_write_pos_] = left_sample;
-  delay_buffer_right_[delay_write_pos_] = right_sample;
-  
-  delay_write_pos_ = (delay_write_pos_ + 1) % delay_buffer_size_;
-}
-
-void LimiterProcessor::GetDelayedSample(float& left_out, float& right_out) {
-  if (delay_buffer_size_ == 0) {
-    return;  // No delay, keep current values
+  // 4x uses all phases. 2x uses phases 0 and 2, which sit half a sample
+  // apart. Every phase is offset 1/8 sample from the input grid, so the
+  // worst-case distance to a true peak is the same as with a dedicated 2x
+  // filter.
+  const size_t phase_step = (oversampling_ == 4) ? 1 : 2;
+  for (size_t p = 0; p < kTruePeakPhases; p += phase_step) {
+    peak = std::max(peak, std::max(std::abs(acc[p]),
+                                   std::abs(acc[kTruePeakPhases + p])));
   }
-  
-  left_out = delay_buffer_left_[delay_read_pos_];
-  right_out = delay_buffer_right_[delay_read_pos_];
-  
-  delay_read_pos_ = (delay_read_pos_ + 1) % delay_buffer_size_;
+  return peak;
+}
+
+float LimiterProcessor::SlidingMinimum(float value) {
+  // Monotonic deque: values increase from head to tail. Drop everything at the
+  // tail that is >= the new value (it can never be the minimum again), push the
+  // new value, then expire the head if it has left the window.
+  while (min_tail_ != min_head_) {
+    const size_t last = (min_tail_ - 1) & min_mask_;
+    if (min_values_[last] < value) break;
+    min_tail_ = last;
+  }
+  min_values_[min_tail_] = value;
+  min_indices_[min_tail_] = sample_index_;
+  min_tail_ = (min_tail_ + 1) & min_mask_;
+
+  const uint64_t expire_before = sample_index_ + 1 - lookahead_samples_;
+  if (sample_index_ + 1 >= lookahead_samples_ &&
+      min_indices_[min_head_] < expire_before) {
+    min_head_ = (min_head_ + 1) & min_mask_;
+  }
+
+  ++sample_index_;
+  return min_values_[min_head_];
+}
+
+float LimiterProcessor::MovingAverage(float value) {
+  const size_t w = box_.size();
+  box_sum_ += static_cast<double>(value) - static_cast<double>(box_[box_pos_]);
+  box_[box_pos_] = value;
+  box_pos_ = (box_pos_ + 1 == w) ? 0 : box_pos_ + 1;
+
+  // Re-sum exactly once per window to keep the running sum drift-free over
+  // arbitrarily long sessions. Amortised O(1) per sample.
+  if (++box_refresh_counter_ >= w) {
+    box_refresh_counter_ = 0;
+    double sum = 0.0;
+    for (float v : box_) sum += static_cast<double>(v);
+    box_sum_ = sum;
+  }
+
+  const float avg = static_cast<float>(box_sum_ / static_cast<double>(w));
+  return std::min(avg, 1.0f);
+}
+
+inline void LimiterProcessor::ProcessFrame(float in_left, float in_right,
+                                           float& out_left, float& out_right) {
+  // Detector history and delay line
+  history_pos_ = (history_pos_ + 1) & kHistoryMask;
+  history_left_[history_pos_] = in_left;
+  history_right_[history_pos_] = in_right;
+
+  delay_left_[delay_pos_] = in_left;
+  delay_right_[delay_pos_] = in_right;
+  const size_t read_pos = (delay_pos_ - latency_samples_) & delay_mask_;
+  const float delayed_left = delay_left_[read_pos];
+  const float delayed_right = delay_right_[read_pos];
+  delay_pos_ = (delay_pos_ + 1) & delay_mask_;
+
+  // Target gain for this detector frame
+  const float peak = DetectPeak();
+  const float target = (peak > ceiling_lin_) ? ceiling_lin_ / peak : 1.0f;
+
+  // Fast envelope: instant attack, fast release. Always <= target.
+  if (target < fast_env_) {
+    fast_env_ = target;
+  } else {
+    fast_env_ += fast_release_k_ * (target - fast_env_);
+  }
+
+  // Slow envelope: only builds up when limiting is sustained, then holds the
+  // gain down smoothly so dense material (crowd noise) does not flutter.
+  if (target < slow_env_) {
+    slow_env_ += slow_attack_k_ * (target - slow_env_);
+  } else {
+    slow_env_ += slow_release_k_ * (target - slow_env_);
+  }
+
+  const float released = static_cast<float>(std::min(fast_env_, slow_env_));
+
+  // Hold for the lookahead window, then ramp linearly over it.
+  const float held = SlidingMinimum(released);
+  const float gain = MovingAverage(held);
+
+  block_min_gain_ = std::min(block_min_gain_, gain);
+
+  // Apply to the delayed audio, scale to the output level, and clip as a guard
+  // against floating-point rounding.
+  const float g = gain * output_gain_;
+  out_left = std::clamp(delayed_left * g, -output_ceiling_, output_ceiling_);
+  out_right = std::clamp(delayed_right * g, -output_ceiling_, output_ceiling_);
+}
+
+void LimiterProcessor::BeginBlock() { block_min_gain_ = 1.0f; }
+
+void LimiterProcessor::EndBlock() {
+  gain_reduction_db_ = std::min(LinearToDb(block_min_gain_), 0.0f);
 }
 
 void LimiterProcessor::Process(float* buffer, size_t num_frames) {
-  // Calculate the gain needed to bring threshold to output level
-  const float output_gain = DbToLinear(params_.output_level_db - params_.threshold_db);
-  
-  for (size_t i = 0; i < num_frames * 2; i += 2) {
-    float left = buffer[i];
-    float right = buffer[i + 1];
-    
-    // Store in delay buffer for lookahead
-    UpdateDelayBuffer(left, right);
-    
-    // Get peak level from current (future) stereo pair
-    const float left_abs = std::abs(left);
-    const float right_abs = std::abs(right);
-    const float peak = std::max(left_abs, right_abs);
-    
-    // Convert to dB
-    const float peak_db = LinearToDb(peak);
-    
-    // Calculate target gain reduction in dB (brickwall: anything above threshold gets reduced)
-    const float gain_reduction_db = CalculateGainReduction(peak_db);
-    const float target_gain = DbToLinear(gain_reduction_db);
-    
-    // Apply envelope (instant attack, fast release)
-    envelope_gain_ = ApplyEnvelope(target_gain, envelope_gain_);
-    
-    // Store gain reduction for metering
-    gain_reduction_db_ = LinearToDb(envelope_gain_);
-    
-    // Get delayed samples (past audio)
-    float delayed_left = left;
-    float delayed_right = right;
-    GetDelayedSample(delayed_left, delayed_right);
-    
-    // Apply gain reduction and output scaling to delayed samples
-    buffer[i] = delayed_left * envelope_gain_ * output_gain;
-    buffer[i + 1] = delayed_right * envelope_gain_ * output_gain;
+  BeginBlock();
+  for (size_t i = 0; i < num_frames; ++i) {
+    float* frame = buffer + 2 * i;
+    ProcessFrame(frame[0], frame[1], frame[0], frame[1]);
   }
+  EndBlock();
 }
 
-void LimiterProcessor::ProcessStereo(float* left, float* right, 
+void LimiterProcessor::ProcessStereo(float* left, float* right,
                                      size_t num_frames) {
-  // Calculate the gain needed to bring threshold to output level
-  const float output_gain = DbToLinear(params_.output_level_db - params_.threshold_db);
-  
+  BeginBlock();
   for (size_t i = 0; i < num_frames; ++i) {
-    float left_sample = left[i];
-    float right_sample = right[i];
-    
-    // Store in delay buffer for lookahead
-    UpdateDelayBuffer(left_sample, right_sample);
-    
-    // Get peak level from current (future) stereo pair
-    const float left_abs = std::abs(left_sample);
-    const float right_abs = std::abs(right_sample);
-    const float peak = std::max(left_abs, right_abs);
-    
-    // Convert to dB
-    const float peak_db = LinearToDb(peak);
-    
-    // Calculate target gain reduction in dB (brickwall: anything above threshold gets reduced)
-    const float gain_reduction_db = CalculateGainReduction(peak_db);
-    const float target_gain = DbToLinear(gain_reduction_db);
-    
-    // Apply envelope (instant attack, fast release)
-    envelope_gain_ = ApplyEnvelope(target_gain, envelope_gain_);
-    
-    // Store gain reduction for metering (will be negative or zero)
-    gain_reduction_db_ = LinearToDb(envelope_gain_);
-    
-    // Get delayed samples (past audio)
-    float delayed_left = left_sample;
-    float delayed_right = right_sample;
-    GetDelayedSample(delayed_left, delayed_right);
-    
-    // Apply gain reduction and output scaling to delayed samples
-    left[i] = delayed_left * envelope_gain_ * output_gain;
-    right[i] = delayed_right * envelope_gain_ * output_gain;
+    // Read both inputs before writing so left and right may alias.
+    const float in_left = left[i];
+    const float in_right = right[i];
+    float out_left;
+    float out_right;
+    ProcessFrame(in_left, in_right, out_left, out_right);
+    left[i] = out_left;
+    right[i] = out_right;
   }
+  EndBlock();
 }
 
 }  // namespace fast_limiter

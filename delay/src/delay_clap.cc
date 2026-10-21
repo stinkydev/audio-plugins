@@ -232,6 +232,11 @@ clap_process_status DelayClap::Process(const clap_process_t* process) noexcept {
     ProcessParameterChanges(process->in_events);
   }
 
+  // Hand the current parameter values to the processor. This is the only
+  // place the processor's parameters change while active, so main-thread
+  // state loads and flushes only ever touch the atomics.
+  UpdateProcessorParams();
+
   const uint32_t frame_count = process->frames_count;
   const uint32_t input_count = process->audio_inputs_count;
   const uint32_t output_count = process->audio_outputs_count;
@@ -240,24 +245,31 @@ clap_process_status DelayClap::Process(const clap_process_t* process) noexcept {
     return CLAP_PROCESS_SLEEP;
   }
 
-  const uint32_t in_channels = process->audio_inputs[0].channel_count;
-  const uint32_t out_channels = process->audio_outputs[0].channel_count;
-  
-  float* in_left = process->audio_inputs[0].data32[0];
-  float* in_right = (in_channels > 1) ? process->audio_inputs[0].data32[1] : nullptr;
-  float* out_left = process->audio_outputs[0].data32[0];
-  float* out_right = (out_channels > 1) ? process->audio_outputs[0].data32[1] : nullptr;
+  const clap_audio_buffer_t& in = process->audio_inputs[0];
+  const clap_audio_buffer_t& out = process->audio_outputs[0];
 
-  std::memcpy(out_left, in_left, frame_count * sizeof(float));
-  if (in_right && out_right) {
+  // The port does not advertise 64-bit support, so the host must give us
+  // 32-bit buffers. Refuse anything else rather than dereference null.
+  if (!in.data32 || !out.data32 || in.channel_count == 0 ||
+      out.channel_count == 0) {
+    return CLAP_PROCESS_ERROR;
+  }
+
+  float* in_left = in.data32[0];
+  float* in_right = (in.channel_count > 1) ? in.data32[1] : in_left;
+  float* out_left = out.data32[0];
+  float* out_right = (out.channel_count > 1) ? out.data32[1] : out_left;
+
+  if (out_left != in_left) {
+    std::memcpy(out_left, in_left, frame_count * sizeof(float));
+  }
+  if (out_right != out_left && out_right != in_right) {
     std::memcpy(out_right, in_right, frame_count * sizeof(float));
   }
 
-  if (out_right) {
-    processor_.ProcessStereo(out_left, out_right, frame_count);
-  } else {
-    processor_.ProcessStereo(out_left, out_left, frame_count);
-  }
+  // In place. For a mono output both pointers alias the same buffer, which
+  // the processor supports.
+  processor_.ProcessStereo(out_left, out_right, frame_count);
 
   return CLAP_PROCESS_CONTINUE;
 }
@@ -382,10 +394,11 @@ bool DelayClap::StateLoad(const clap_istream_t* stream) noexcept {
   if (read != sizeof(values)) return false;
 
   for (int i = 0; i < kParamIdCount; ++i) {
-    param_values_[i].store(values[i]);
+    param_values_[i].store(std::clamp(values[i], 0.0, 1.0));
   }
 
-  UpdateProcessorParams();
+  // The processor picks the new values up at the start of the next block
+  // (or on activate), so no processor access from this main-thread call.
   return true;
 }
 
@@ -402,21 +415,23 @@ void DelayClap::ProcessParameterChanges(const clap_input_events_t* events) noexc
       SetParamValue(param_event->param_id, param_event->value);
     }
   }
-
-  UpdateProcessorParams();
 }
 
 void DelayClap::UpdateProcessorParams() noexcept {
   DelayParams params;
   params.delay_time_ms = static_cast<float>(NormalizedToDelayTime(param_values_[kParamIdDelayTime].load()));
   params.mix = static_cast<float>(NormalizedToMix(param_values_[kParamIdMix].load()));
-  
-  processor_.SetParams(params);
+
+  const DelayParams& current = processor_.GetParams();
+  if (params.delay_time_ms != current.delay_time_ms ||
+      params.mix != current.mix) {
+    processor_.SetParams(params);
+  }
 }
 
 void DelayClap::SetParamValue(clap_id param_id, double value) noexcept {
   if (param_id < kParamIdCount) {
-    param_values_[param_id].store(value);
+    param_values_[param_id].store(std::clamp(value, 0.0, 1.0));
   }
 }
 

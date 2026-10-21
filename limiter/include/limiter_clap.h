@@ -28,10 +28,14 @@ constexpr double kThresholdMax = 0.0;
 constexpr double kOutputLevelMin = -60.0;
 constexpr double kOutputLevelMax = 0.0;
 
+// Defaults: -1 dBTP is the EBU R128 broadcast true-peak maximum.
+constexpr double kThresholdDefault = -1.0;
+constexpr double kOutputLevelDefault = -1.0;
+
 // CLAP parameter IDs
 enum LimiterParamId {
-  kParamIdThreshold = 0,    // @ts-param min=-60.0 max=0.0 default=-0.1 unit=dB label="Threshold"
-  kParamIdOutputLevel,        // @ts-param min=-60.0 max=0.0 default=-0.1 unit=dB label="Output Level"
+  kParamIdThreshold = 0,    // @ts-param min=-60.0 max=0.0 default=-1.0 unit=dB label="Threshold"
+  kParamIdOutputLevel,        // @ts-param min=-60.0 max=0.0 default=-1.0 unit=dB label="Output Level"
   kParamIdCount
 };
 
@@ -76,22 +80,28 @@ class LimiterClap {
   bool AudioPortsGet(uint32_t index, bool is_input,
                      clap_audio_port_info_t* info) const noexcept;
 
+  // Latency extension: total plugin delay in samples at the active sample rate
+  uint32_t Latency() const noexcept { return processor_.GetLatencySamples(); }
+
   const clap_plugin_t* ClapPlugin() noexcept { return &plugin_; }
 
-  // Get current gain reduction for metering
-  float GetGainReduction() const noexcept { return processor_.GetGainReduction(); }
+  // Get current gain reduction for metering (dB, <= 0)
+  float GetGainReduction() const noexcept { return gain_reduction_db_.load(); }
 
  private:
   void ProcessParameterChanges(const clap_input_events_t* events) noexcept;
+  // Push the stored parameter values into the processor. Only called from the
+  // thread that owns the processor (audio thread while active, main thread
+  // during init/activate).
   void UpdateProcessorParams() noexcept;
-  double ParamIdToValue(clap_id param_id) const noexcept;
   void SetParamValue(clap_id param_id, double value) noexcept;
 
   clap_plugin_t plugin_;
   const clap_host_t* host_;
   LimiterProcessor processor_;
-  
+
   std::atomic<double> param_values_[kParamIdCount];
+  std::atomic<float> gain_reduction_db_;
   double sample_rate_;
   bool is_processing_;
 };

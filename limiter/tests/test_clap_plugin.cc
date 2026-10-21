@@ -121,11 +121,11 @@ TEST_F(ClapPluginTest, ParamsValueToTextFormatsCorrectly) {
   // ParamsValueToText takes normalized values (0-1) and converts them to text
   EXPECT_TRUE(plugin_->ParamsInfo(kParamIdThreshold, &info));
   EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdThreshold, info.default_value, display, sizeof(display)));
-  EXPECT_STREQ(display, "-0.10 dB");
+  EXPECT_STREQ(display, "-1.00 dB");
   
   EXPECT_TRUE(plugin_->ParamsInfo(kParamIdOutputLevel, &info));
   EXPECT_TRUE(plugin_->ParamsValueToText(kParamIdOutputLevel, info.default_value, display, sizeof(display)));
-  EXPECT_STREQ(display, "-0.10 dB");
+  EXPECT_STREQ(display, "-1.00 dB");
 }
 
 TEST_F(ClapPluginTest, ParamsTextToValueParsesCorrectly) {
@@ -167,6 +167,25 @@ TEST_F(ClapPluginTest, GetExtensionReturnsValidPointers) {
   EXPECT_NE(plugin_->GetExtension(CLAP_EXT_AUDIO_PORTS), nullptr);
   EXPECT_NE(plugin_->GetExtension(CLAP_EXT_PARAMS), nullptr);
   EXPECT_NE(plugin_->GetExtension(CLAP_EXT_STATE), nullptr);
+  EXPECT_NE(plugin_->GetExtension(CLAP_EXT_LATENCY), nullptr);
+}
+
+TEST_F(ClapPluginTest, LatencyFollowsSampleRate) {
+  const auto* latency_ext = static_cast<const clap_plugin_latency_t*>(
+      plugin_->GetExtension(CLAP_EXT_LATENCY));
+  ASSERT_NE(latency_ext, nullptr);
+
+  plugin_->Activate(48000.0, 64, 512);
+  const uint32_t at_48k = latency_ext->get(plugin_->ClapPlugin());
+  // 5 ms lookahead (240 samples) plus the true-peak filter delay
+  EXPECT_GE(at_48k, 239u);
+  EXPECT_LE(at_48k, 248u);
+
+  plugin_->Deactivate();
+  plugin_->Activate(96000.0, 64, 512);
+  const uint32_t at_96k = latency_ext->get(plugin_->ClapPlugin());
+  EXPECT_GE(at_96k, 479u);
+  EXPECT_LE(at_96k, 488u);
 }
 
 TEST_F(ClapPluginTest, GetExtensionReturnsNullForUnknown) {
@@ -260,11 +279,21 @@ TEST_F(ProcessTest, ProcessLowLevelSignalPassesThrough) {
   }
   
   EXPECT_EQ(plugin_->Process(&process_), CLAP_PROCESS_CONTINUE);
-  
-  // Should pass through with minimal change
-  for (size_t i = 0; i < kBufferSize; ++i) {
-    EXPECT_NEAR(output_left_[i], kSignalLevel, 0.01f);
-    EXPECT_NEAR(output_right_[i], kSignalLevel, 0.01f);
+
+  // Should pass through unchanged once the lookahead delay has elapsed
+  const auto* latency_ext = static_cast<const clap_plugin_latency_t*>(
+      plugin_->GetExtension(CLAP_EXT_LATENCY));
+  ASSERT_NE(latency_ext, nullptr);
+  const uint32_t latency = latency_ext->get(plugin_->ClapPlugin());
+  ASSERT_LT(latency, kBufferSize);
+
+  for (size_t i = 0; i < latency; ++i) {
+    EXPECT_FLOAT_EQ(output_left_[i], 0.0f);
+    EXPECT_FLOAT_EQ(output_right_[i], 0.0f);
+  }
+  for (size_t i = latency; i < kBufferSize; ++i) {
+    EXPECT_NEAR(output_left_[i], kSignalLevel, 1e-5f);
+    EXPECT_NEAR(output_right_[i], kSignalLevel, 1e-5f);
   }
 }
 
@@ -276,14 +305,61 @@ TEST_F(ProcessTest, ProcessHighLevelSignalIsLimited) {
     input_right_[i] = kSignalLevel;
   }
   
-  EXPECT_EQ(plugin_->Process(&process_), CLAP_PROCESS_CONTINUE);
-  
-  // After limiting with lookahead, signal should be under threshold
-  // Note: First few samples may still be high due to lookahead delay
-  for (size_t i = 100; i < kBufferSize; ++i) {
-    EXPECT_LE(std::abs(output_left_[i]), 1.01f);   // Allow small tolerance
-    EXPECT_LE(std::abs(output_right_[i]), 1.01f);
+  // Run enough blocks (~350 ms) for the release to settle after the step edge.
+  // A hard step has genuine inter-sample overshoot, which the true-peak
+  // detector catches and the fast release then recovers from.
+  const float ceiling = std::pow(10.0f, -1.0f / 20.0f);  // default -1 dB
+  for (int block = 0; block < 30; ++block) {
+    EXPECT_EQ(plugin_->Process(&process_), CLAP_PROCESS_CONTINUE);
+    // Brickwall: no sample anywhere in the output may exceed the ceiling
+    for (size_t i = 0; i < kBufferSize; ++i) {
+      EXPECT_LE(std::abs(output_left_[i]), ceiling + 1e-6f);
+      EXPECT_LE(std::abs(output_right_[i]), ceiling + 1e-6f);
+    }
   }
+  // ... but the signal must still come through at the ceiling
+  EXPECT_NEAR(output_left_[kBufferSize - 1], ceiling, 0.01f);
+}
+
+TEST_F(ProcessTest, ParameterChangeIsAppliedOnAudioThread) {
+  // Lower the output level via a param event and confirm the ceiling follows
+  clap_event_param_value_t event{};
+  event.header.size = sizeof(event);
+  event.header.time = 0;
+  event.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+  event.header.type = CLAP_EVENT_PARAM_VALUE;
+  event.header.flags = 0;
+  event.param_id = kParamIdOutputLevel;
+  event.note_id = -1;
+  event.port_index = -1;
+  event.channel = -1;
+  event.key = -1;
+  event.value = (-12.0 - kOutputLevelMin) / (kOutputLevelMax - kOutputLevelMin);
+
+  struct EventList {
+    clap_input_events_t api;
+    const clap_event_header_t* header;
+  } list;
+  list.header = &event.header;
+  list.api.ctx = &list;
+  list.api.size = [](const clap_input_events_t*) -> uint32_t { return 1; };
+  list.api.get = [](const clap_input_events_t* l, uint32_t) {
+    return static_cast<const EventList*>(l->ctx)->header;
+  };
+  process_.in_events = &list.api;
+
+  for (size_t i = 0; i < kBufferSize; ++i) {
+    input_left_[i] = 2.0f;
+    input_right_[i] = 2.0f;
+  }
+  const float ceiling = std::pow(10.0f, -12.0f / 20.0f);
+  for (int block = 0; block < 30; ++block) {
+    EXPECT_EQ(plugin_->Process(&process_), CLAP_PROCESS_CONTINUE);
+    for (size_t i = 0; i < kBufferSize; ++i) {
+      EXPECT_LE(std::abs(output_left_[i]), ceiling + 1e-6f);
+    }
+  }
+  EXPECT_NEAR(output_left_[kBufferSize - 1], ceiling, 0.01f);
 }
 
 TEST_F(ProcessTest, GainReductionIsApplied) {
@@ -299,6 +375,19 @@ TEST_F(ProcessTest, GainReductionIsApplied) {
   // Check that gain reduction is being reported
   float gain_reduction = plugin_->GetGainReduction();
   EXPECT_LT(gain_reduction, 0.0f);  // Should be negative (reduction)
+}
+
+TEST_F(ProcessTest, ResetClearsGainReductionMeter) {
+  for (size_t i = 0; i < kBufferSize; ++i) {
+    input_left_[i] = 2.0f;
+    input_right_[i] = 2.0f;
+  }
+  plugin_->Process(&process_);
+  ASSERT_LT(plugin_->GetGainReduction(), 0.0f);
+
+  // reset() zeroes the processor's meter; the wrapper's copy must follow.
+  plugin_->Reset();
+  EXPECT_FLOAT_EQ(plugin_->GetGainReduction(), 0.0f);
 }
 
 }  // namespace

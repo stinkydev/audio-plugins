@@ -5,15 +5,18 @@ A high-quality 4-band parametric equalizer CLAP plugin with multiple filter type
 ## Features
 
 - **4 Independent Bands**: Each band can be configured independently
-- **Multiple Filter Types**:
-  - Low Pass: Cuts frequencies above the cutoff
-  - High Pass: Cuts frequencies below the cutoff
-  - Low Shelf: Boosts or cuts low frequencies
-  - High Shelf: Boosts or cuts high frequencies
-  - Peak: Boosts or cuts at a specific frequency
-  - Band Pass: Allows only frequencies around the center frequency
-  - Notch: Cuts frequencies around the center frequency
-  - All Pass: Phase-only filter (for special effects)
+- **Filter Types** (any type on any band):
+  - Low Cut: 12 dB/octave high-pass, -3 dB at the set frequency with Q 0.707
+  - Bell: Boosts or cuts around the set frequency
+  - Low Shelf: Boosts or cuts below the set frequency
+  - High Shelf: Boosts or cuts above the set frequency
+  - High Cut: 12 dB/octave low-pass, -3 dB at the set frequency with Q 0.707
+
+  Filters follow the RBJ Audio EQ Cookbook and run in double precision.
+  For shelves, Q is the cookbook's Q parameter (`alpha = sin(w0) / 2Q`), not
+  its shelf-slope parameter S. Q = 0.707 is the maximally flat shelf, the same
+  response as slope S = 1; values above about 1 add a resonant peak and dip
+  at the shelf corner.
   
 - **Per-Band Controls**:
   - Filter Type selection

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(AudioPlugins VERSION 0.0.6 LANGUAGES CXX)
+project(AudioPlugins VERSION 0.0.7 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,6 +11,7 @@ option(BUILD_EQ "Build Stinky EQ plugin" ON)
 option(BUILD_LIMITER "Build Stinky Limiter plugin" ON)
 option(BUILD_DELAY "Build Stinky Delay plugin" ON)
 option(BUILD_TESTS "Build test suite for all plugins" ON)
+option(BUILD_BENCHMARKS "Build throughput benchmarks for all plugins" ON)
 option(ENABLE_SIMD "Enable SIMD optimizations (compressor, limiter)" ON)
 
 # Fetch CLAP SDK once for all plugins
@@ -48,6 +49,30 @@ endif()
 
 if(BUILD_DELAY)
     add_subdirectory(delay)
+endif()
+
+# Aggregate benchmark runner. Numbers are only meaningful from a Release build:
+#   cmake --build . --config Release --target bench
+if(BUILD_BENCHMARKS)
+    set(BENCH_TARGETS)
+    foreach(target CompressorBench EqBench LimiterBench DelayBench)
+        if(TARGET ${target})
+            list(APPEND BENCH_TARGETS ${target})
+        endif()
+    endforeach()
+    set(BENCH_COMMANDS)
+    foreach(target ${BENCH_TARGETS})
+        list(APPEND BENCH_COMMANDS COMMAND $<TARGET_FILE:${target}>)
+    endforeach()
+    add_custom_target(bench
+        ${BENCH_COMMANDS}
+        COMMENT "Running plugin throughput benchmarks"
+        USES_TERMINAL
+        VERBATIM
+    )
+    if(BENCH_TARGETS)
+        add_dependencies(bench ${BENCH_TARGETS})
+    endif()
 endif()
 
 # Emit third-party license notices alongside the build output so downstream
@@ -94,6 +119,7 @@ message(STATUS "  Compressor: ${BUILD_COMPRESSOR}")
 message(STATUS "  EQ:         ${BUILD_EQ}")
 message(STATUS "  Limiter:    ${BUILD_LIMITER}")
 message(STATUS "  Tests:      ${BUILD_TESTS}")
+message(STATUS "  Benchmarks: ${BUILD_BENCHMARKS}")
 message(STATUS "  SIMD:       ${ENABLE_SIMD}")
 message(STATUS "═══════════════════════════════════════")
 message(STATUS "")

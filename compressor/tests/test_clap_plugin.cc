@@ -398,5 +398,91 @@ TEST_F(ClapPluginTest, MultipleProcessCallsWork) {
   SUCCEED();
 }
 
+TEST_F(ClapPluginTest, ResetClearsGainReductionMeter) {
+  plugin_->Activate(44100.0, 64, 512);
+  plugin_->StartProcessing();
+
+  constexpr uint32_t frame_count = 64;
+  std::vector<float> in_left(frame_count, 0.5f);  // -6 dB, above threshold
+  std::vector<float> in_right(frame_count, 0.5f);
+  std::vector<float> out_left(frame_count, 0.0f);
+  std::vector<float> out_right(frame_count, 0.0f);
+  float* in_ptrs[] = {in_left.data(), in_right.data()};
+  float* out_ptrs[] = {out_left.data(), out_right.data()};
+  clap_audio_buffer_t input = {in_ptrs, nullptr, 2, frame_count, 0};
+  clap_audio_buffer_t output = {out_ptrs, nullptr, 2, frame_count, 0};
+
+  clap_process_t process = {};
+  process.frames_count = frame_count;
+  process.audio_inputs = &input;
+  process.audio_inputs_count = 1;
+  process.audio_outputs = &output;
+  process.audio_outputs_count = 1;
+
+  for (int i = 0; i < 4; ++i) plugin_->Process(&process);
+  ASSERT_LT(plugin_->GetGainReduction(), 0.0f);
+
+  // reset() zeroes the processor's meter; the wrapper's copy must follow.
+  plugin_->Reset();
+  EXPECT_FLOAT_EQ(plugin_->GetGainReduction(), 0.0f);
+}
+
+TEST_F(ClapPluginTest, ActivateAppliesStoredMakeupWithoutRamp) {
+  // A parameter set before activation (a preset or state load) must be in
+  // effect from the first sample. Activate() used to reset the makeup
+  // smoother before syncing the stored values, so playback started ~20 dB
+  // quiet and ramped up over 10 ms.
+  clap_event_param_value_t event{};
+  event.header.size = sizeof(event);
+  event.header.time = 0;
+  event.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+  event.header.type = CLAP_EVENT_PARAM_VALUE;
+  event.header.flags = 0;
+  event.param_id = kParamIdMakeupGain;
+  event.note_id = -1;
+  event.port_index = -1;
+  event.channel = -1;
+  event.key = -1;
+  event.value = (20.0 - kMakeupMin) / (kMakeupMax - kMakeupMin);
+
+  struct EventList {
+    clap_input_events_t api;
+    const clap_event_header_t* header;
+  } list;
+  list.header = &event.header;
+  list.api.ctx = &list;
+  list.api.size = [](const clap_input_events_t*) -> uint32_t { return 1; };
+  list.api.get = [](const clap_input_events_t* l, uint32_t) {
+    return static_cast<const EventList*>(l->ctx)->header;
+  };
+  plugin_->ParamsFlush(&list.api, nullptr);
+
+  ASSERT_TRUE(plugin_->Activate(44100.0, 64, 512));
+  plugin_->StartProcessing();
+
+  // -40 dB input sits well below the -20 dB threshold, so the only gain
+  // applied is the +20 dB makeup.
+  constexpr uint32_t frame_count = 64;
+  std::vector<float> in_left(frame_count, 0.01f);
+  std::vector<float> in_right(frame_count, 0.01f);
+  std::vector<float> out_left(frame_count, 0.0f);
+  std::vector<float> out_right(frame_count, 0.0f);
+  float* in_ptrs[] = {in_left.data(), in_right.data()};
+  float* out_ptrs[] = {out_left.data(), out_right.data()};
+  clap_audio_buffer_t input = {in_ptrs, nullptr, 2, frame_count, 0};
+  clap_audio_buffer_t output = {out_ptrs, nullptr, 2, frame_count, 0};
+
+  clap_process_t process = {};
+  process.frames_count = frame_count;
+  process.audio_inputs = &input;
+  process.audio_inputs_count = 1;
+  process.audio_outputs = &output;
+  process.audio_outputs_count = 1;
+
+  ASSERT_EQ(plugin_->Process(&process), CLAP_PROCESS_CONTINUE);
+  EXPECT_NEAR(out_left[0], 0.1f, 1e-3f);
+  EXPECT_NEAR(out_right[0], 0.1f, 1e-3f);
+}
+
 }  // namespace
 }  // namespace fast_compressor
