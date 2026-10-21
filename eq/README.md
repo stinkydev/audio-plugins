@@ -13,8 +13,10 @@ A high-quality 4-band parametric equalizer CLAP plugin with multiple filter type
   - High Cut: 12 dB/octave low-pass, -3 dB at the set frequency with Q 0.707
 
   Filters follow the RBJ Audio EQ Cookbook and run in double precision.
-  For shelves, Q is the RBJ shelf slope: 0.707 gives a classic smooth shelf,
-  and values above about 1 add a resonant peak and dip at the shelf corner.
+  For shelves, Q is the cookbook's Q parameter (`alpha = sin(w0) / 2Q`), not
+  its shelf-slope parameter S. Q = 0.707 is the maximally flat shelf, the same
+  response as slope S = 1; values above about 1 add a resonant peak and dip
+  at the shelf corner.
   
 - **Per-Band Controls**:
   - Filter Type selection

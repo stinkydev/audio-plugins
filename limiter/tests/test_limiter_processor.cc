@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <vector>
 
 namespace fast_limiter {
@@ -156,6 +157,110 @@ TEST_P(LimiterProcessorTest, DetectsInterSamplePeaks) {
   EXPECT_LT(sample_peak_out, 0.68f);
   EXPECT_NEAR(true_peak_out, ceiling_, 0.02f);
   EXPECT_LT(processor_.GetGainReduction(), -0.5f);
+}
+
+// Independent BS.1770-4 true-peak meter: the published 4x polyphase filter,
+// accumulated in double, at the oversampling factor the standard prescribes
+// for the rate (4x up to 48 kHz, 2x at 88.2/96 kHz, none above).
+constexpr double kBs1770Coeffs[4][12] = {
+    {0.0017089843750, 0.0109863281250, -0.0196533203125, 0.0332031250000,
+     -0.0594482421875, 0.1373291015625, 0.9721679687500, -0.1022949218750,
+     0.0476074218750, -0.0266113281250, 0.0148925781250, -0.0083007812500},
+    {-0.0291748046875, 0.0292968750000, -0.0517578125000, 0.0891113281250,
+     -0.1665039062500, 0.4650878906250, 0.7797851562500, -0.2003173828125,
+     0.1015625000000, -0.0582275390625, 0.0330810546875, -0.0189208984375},
+    {-0.0189208984375, 0.0330810546875, -0.0582275390625, 0.1015625000000,
+     -0.2003173828125, 0.7797851562500, 0.4650878906250, -0.1665039062500,
+     0.0891113281250, -0.0517578125000, 0.0292968750000, -0.0291748046875},
+    {-0.0083007812500, 0.0148925781250, -0.0266113281250, 0.0476074218750,
+     -0.1022949218750, 0.9721679687500, 0.1373291015625, -0.0594482421875,
+     0.0332031250000, -0.0196533203125, 0.0109863281250, 0.0017089843750},
+};
+
+double TruePeak(const std::vector<float>& v, double sample_rate) {
+  const int factor = sample_rate < 64000.0 ? 4 : sample_rate < 128000.0 ? 2 : 1;
+  double peak = MaxAbs(v);
+  if (factor == 1) return peak;
+  const size_t phase_step = (factor == 4) ? 1 : 2;
+  for (size_t n = 11; n < v.size(); ++n) {
+    for (size_t p = 0; p < 4; p += phase_step) {
+      double acc = 0.0;
+      for (size_t k = 0; k < 12; ++k) acc += kBs1770Coeffs[p][k] * v[n - k];
+      peak = std::max(peak, std::abs(acc));
+    }
+  }
+  return peak;
+}
+
+// The true-peak ceiling is a bound, not a guarantee (the README documents the
+// contract). The gain changes between samples, so the interpolation of the
+// limited output is not the limited interpolation of the input, and the
+// detector itself is the BS.1770 estimate. Measure the output with an
+// independent meter on material that stresses both effects, and pin the
+// worst case to the documented bound.
+// Measured worst case: 0.003 dB on full-band white noise 10 dB over the
+// ceiling at 44.1 kHz; under 0.0005 dB on everything else.
+constexpr double kDocumentedTruePeakOvershootDb = 0.01;
+
+TEST_P(LimiterProcessorTest, TruePeakOvershootStaysWithinDocumentedBound) {
+  const double sr = sample_rate_;
+  const size_t n = static_cast<size_t>(sr);
+  struct Signal {
+    const char* name;
+    std::vector<float> data;
+  };
+  std::vector<Signal> signals;
+  auto add = [&](const char* name, auto&& fn) {
+    Signal s{name, std::vector<float>(n)};
+    for (size_t i = 0; i < n; ++i) s.data[i] = static_cast<float>(fn(i / sr, i));
+    signals.push_back(std::move(s));
+  };
+  add("hot 1 kHz sine switched on", [&](double t, size_t) {
+    return t < 0.1 ? 0.0 : 2.0 * std::sin(2.0 * kPi * 1000.0 * t);
+  });
+  add("11 kHz sine, off-grid peaks", [&](double t, size_t) {
+    return 1.5 * std::sin(2.0 * kPi * 11000.0 * t + 0.3);
+  });
+  add("16 kHz sine, off-grid peaks", [&](double t, size_t) {
+    return 1.5 * std::sin(2.0 * kPi * 16000.0 * t + 0.7);
+  });
+  add("2 kHz sine gated every 40 ms", [&](double t, size_t) {
+    const double amp = (static_cast<int>(t / 0.04) % 2) ? 2.0 : 0.3;
+    return amp * std::sin(2.0 * kPi * 2000.0 * t);
+  });
+  add("clicks over a 500 Hz sine", [&](double t, size_t i) {
+    const double click = (i % (n / 20) == n / 40) ? 3.0 : 0.0;
+    return 0.5 * std::sin(2.0 * kPi * 500.0 * t) + click;
+  });
+  add("100 Hz square wave", [&](double t, size_t) {
+    return std::sin(2.0 * kPi * 100.0 * t) >= 0.0 ? 1.5 : -1.5;
+  });
+  add("fs/4 sine, peaks between samples", [&](double, size_t i) {
+    return 2.0 * std::sin(kPi / 2.0 * i + kPi / 4.0);
+  });
+  add("Nyquist tone", [&](double, size_t i) { return (i % 2) ? 1.5 : -1.5; });
+  add("19 kHz sine", [&](double t, size_t) {
+    return 1.3 * std::sin(2.0 * kPi * 19000.0 * t + 0.1);
+  });
+  add("sweep 20 Hz to 20 kHz", [&](double t, size_t) {
+    return 1.5 * std::sin(2.0 * kPi * (20.0 * t + 0.5 * 19980.0 * t * t));
+  });
+  add("white noise, 10 dB over", [&](double, size_t) {
+    static uint32_t seed = 12345u;
+    seed = seed * 1664525u + 1013904223u;
+    return 3.0 * (static_cast<double>(seed >> 8) / 16777216.0 - 0.5) * 2.0;
+  });
+
+  for (Signal& s : signals) {
+    processor_.Reset();
+    std::vector<float> l = s.data, r = s.data;
+    for (float& x : r) x *= 0.9f;
+    ProcessInBlocks(processor_, l, r);
+
+    EXPECT_LE(MaxAbs(l), ceiling_ + 1e-6f) << s.name;
+    const double overshoot_db = 20.0 * std::log10(TruePeak(l, sr) / ceiling_);
+    EXPECT_LE(overshoot_db, kDocumentedTruePeakOvershootDb) << s.name;
+  }
 }
 
 TEST_P(LimiterProcessorTest, OutputLevelBelowThresholdScalesOutput) {

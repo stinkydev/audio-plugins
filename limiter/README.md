@@ -7,11 +7,14 @@ fixed, known delay.
 
 ## Features
 
-- **Guaranteed ceiling**: the sample-peak ceiling is enforced by construction,
-  not by tuning. No sample leaves the plugin above the output level.
+- **Guaranteed sample-peak ceiling**: enforced by construction, not by tuning.
+  No sample leaves the plugin above the output level.
 - **True-peak detection**: peaks are measured on a 4x oversampled signal using
   the ITU-R BS.1770-4 interpolation filter, so inter-sample overs that would
-  clip a converter or an encoder are caught (2x at 88.2/96 kHz).
+  clip a converter or an encoder are caught (2x at 88.2/96 kHz). This is a
+  tight bound rather than a guarantee: the output's true peak, as a BS.1770
+  meter measures it, stays within 0.01 dB of the ceiling. See "The ceiling
+  contract" below.
 - **5 ms lookahead**: gain reduction ramps in linearly over 5 ms ahead of the
   peak, so transients are caught without clicks.
 - **Dual-stage release**: an 80 ms fast stage handles isolated hits (whistles,
@@ -29,7 +32,8 @@ fixed, known delay.
 ### Threshold
 - **Range**: -60.0 dB to 0.0 dB
 - **Default**: -1.0 dB
-- **Description**: The true-peak ceiling. Anything above this is limited.
+- **Description**: The ceiling. Anything above this is limited: sample peaks
+  never exceed it and true peaks stay within 0.01 dB of it.
 
 ### Output Level
 - **Range**: -60.0 dB to 0.0 dB
@@ -42,7 +46,8 @@ fixed, known delay.
 The default of -1 dBTP is the EBU R128 permitted maximum. For an ATSC A/85
 chain use -2 dB. If the downstream chain still runs on an EBU R68 style PPM
 alignment, set both parameters to the permitted maximum level of that chain
-(typically -9 dBFS).
+(typically -9 dBFS). Where a QC meter must never read above the target, set
+the ceiling 0.1 dB below it; the true-peak bound is well inside that margin.
 
 ## Building
 
@@ -140,7 +145,27 @@ For every frame, both channels linked:
 Because every averaged value at output time is a minimum over a window that
 contains the detector frame for the sample being output, the applied gain is
 always at or below the gain that sample required. That is the brickwall
-guarantee.
+guarantee, and it is exact for sample peaks.
+
+### The ceiling contract
+
+The true-peak ceiling is a bound, not a mathematical guarantee, for two
+reasons. The gain changes from sample to sample, so interpolating the limited
+output is not quite the same as limiting the interpolated input. And the
+detector is the BS.1770 estimate, which is itself an approximation of the
+continuous waveform. The first effect is second order for a smooth gain ramp,
+and the second cancels against a meter that uses the same filter, so the
+overshoot is small. Measured with an independent BS.1770 meter in the test
+suite, it is under 0.0005 dB on tones, transients, square waves and sweeps at
+every supported rate, and 0.003 dB on full-band white noise 10 dB over the
+ceiling. The test pins it below 0.01 dB. A meter built on a different
+interpolation filter can read a few hundredths of a dB differently on content
+close to Nyquist.
+
+Enforcing the ceiling in the oversampled domain would not turn the bound into
+a guarantee: the downsampling filter reintroduces its own inter-sample
+overshoot, and clipping there adds distortion the lookahead design avoids. The
+bound plus a documented margin is the practical contract.
 
 ## Technical Details
 

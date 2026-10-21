@@ -9,6 +9,9 @@
 //      tuning, and a final hard clip guards against float rounding.
 //   2. True-peak aware. Peaks are detected on a 4x oversampled signal using the
 //      ITU-R BS.1770-4 interpolation filter so inter-sample overs are caught.
+//      This is a bound, not a guarantee: the gain changes between samples, so
+//      the output's BS.1770 true peak can exceed the ceiling by a tested
+//      maximum of 0.01 dB. See "The ceiling contract" in the README.
 //   3. Stable on sustained loud material (crowd roar) through a dual release:
 //      a fast stage for isolated transients and a slow stage that takes over
 //      when limiting is sustained.
